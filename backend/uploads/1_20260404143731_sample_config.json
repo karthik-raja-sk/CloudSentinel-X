@@ -1,0 +1,29 @@
+[
+  {
+    "type": "aws_s3_bucket",
+    "name": "customer-pii-bucket-prod",
+    "config": {
+      "acl": "public-read",
+      "policy": "Allow\"*\"",
+      "publicly_accessible": true
+    }
+  },
+  {
+    "type": "aws_security_group",
+    "name": "web-frontend-node-sg",
+    "config": {
+      "ingress": [
+        { "from_port": 22, "to_port": 22, "cidr_blocks": ["0.0.0.0/0"] },
+        { "from_port": 3389, "to_port": 3389, "cidr_blocks": ["0.0.0.0/0"] }
+      ]
+    }
+  },
+  {
+    "type": "aws_db_instance",
+    "name": "rds-prod",
+    "config": {
+      "publicly_accessible": true,
+      "encrypted": false
+    }
+  }
+]

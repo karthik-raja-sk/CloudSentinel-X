@@ -1,0 +1,54 @@
+{
+  "resources": [
+    {
+      "type": "aws_s3_bucket",
+      "name": "customer-pii-bucket-prod",
+      "config": {
+        "acl": "public-read",
+        "policy": "Allow\"*\"",
+        "publicly_accessible": true
+      }
+    },
+    {
+      "type": "aws_iam_user",
+      "name": "john.devops",
+      "config": {
+        "mfa_active": false
+      }
+    }
+  ],
+  "Records": [
+    {
+      "eventTime": "2023-10-01T10:00:00Z",
+      "eventSource": "signin.amazonaws.com",
+      "eventName": "ConsoleLogin",
+      "sourceIPAddress": "185.123.45.67",
+      "userIdentity": { "arn": "arn:aws:iam::123456789012:user/john.devops" },
+      "errorCode": "AccessDenied"
+    },
+    {
+      "eventTime": "2023-10-01T10:00:05Z",
+      "eventSource": "signin.amazonaws.com",
+      "eventName": "ConsoleLogin",
+      "sourceIPAddress": "185.123.45.67",
+      "userIdentity": { "arn": "arn:aws:iam::123456789012:user/john.devops" },
+      "errorCode": "AccessDenied"
+    },
+    {
+      "eventTime": "2023-10-01T10:01:00Z",
+      "eventSource": "signin.amazonaws.com",
+      "eventName": "ConsoleLogin",
+      "sourceIPAddress": "185.123.45.67",
+      "userIdentity": { "arn": "arn:aws:iam::123456789012:user/john.devops" },
+      "errorCode": ""
+    },
+    {
+      "eventTime": "2023-10-01T10:05:00Z",
+      "eventSource": "s3.amazonaws.com",
+      "eventName": "DeleteBucketEncryption",
+      "sourceIPAddress": "185.123.45.67",
+      "userIdentity": { "arn": "arn:aws:iam::123456789012:user/john.devops" },
+      "errorCode": ""
+    }
+  ]
+}

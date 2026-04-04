@@ -1,0 +1,41 @@
+{
+  "assets": [
+    {
+      "id": "s3-bucket-customer-data",
+      "type": "S3_BUCKET",
+      "name": "customer-pii-bucket-prod",
+      "properties": {
+        "encryption_enabled": true,
+        "public_access_block": false,
+        "policy": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "s3:GetObject",
+              "Resource": "arn:aws:s3:::customer-pii-bucket-prod/*"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ec2-instance-web",
+      "type": "EC2_INSTANCE",
+      "name": "web-frontend-node",
+      "properties": {
+        "security_groups": [
+          {
+            "id": "sg-0abc123",
+            "ingress": [
+              { "port": 22, "cidr": "0.0.0.0/0", "protocol": "tcp" },
+              { "port": 80, "cidr": "0.0.0.0/0", "protocol": "tcp" }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "iam": [],
+  "logs": []
+}
