@@ -21,3 +21,4 @@ class Finding(Base):
     recommendation_type = Column(String, nullable=True)
     remediation_text = Column(String, nullable=True)
     sample_masked_value = Column(String, nullable=True)
+    remediation_status = Column(String, default="OPEN", index=True)

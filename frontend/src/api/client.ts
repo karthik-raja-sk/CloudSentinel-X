@@ -25,6 +25,11 @@ export const getFindings = async (projectId: number, type?: string) => {
   return response.data;
 };
 
+export const updateFindingStatus = async (findingId: number, status: string) => {
+  const response = await api.patch(`/findings/${findingId}/status`, { status });
+  return response.data;
+};
+
 export const getIAMEntities = async (projectId: number) => {
   const response = await api.get(`/iam/project/${projectId}`);
   return response.data;

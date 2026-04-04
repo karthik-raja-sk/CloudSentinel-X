@@ -11,18 +11,26 @@ export default function Logs() {
   useEffect(() => {
     async function fetchLogs() {
       try {
+        setLoading(true);
         const data = await getLogEvents(Number(projectId));
-        setLogs(data);
+        setLogs(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
+        setLogs([]);
       } finally {
         setLoading(false);
       }
     }
     if (projectId) fetchLogs();
+    else {
+      setLogs([]);
+      setLoading(false);
+    }
   }, [projectId]);
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-10 h-10 text-blue-500 animate-spin" /></div>;
+
+  const safeLogs = Array.isArray(logs) ? logs : [];
 
   return (
     <div>
@@ -40,24 +48,34 @@ export default function Logs() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {(Array.isArray(logs) ? logs : []).map((L: any) => {
-              const isSuspicious = L.response_status === 'failure' || L.event_name?.includes('Delete') || L.event_name?.includes('Policy') || L.event_name?.includes('Secret');
+            {safeLogs.map((L: any) => {
+              if (!L) return null;
+              
+              const eventNameSafe = String(L.event_name || 'Unknown');
+              const responseStatusSafe = String(L.response_status || 'Unknown');
+              
+              const isSuspicious = responseStatusSafe === 'failure' || 
+                                 eventNameSafe.includes('Delete') || 
+                                 eventNameSafe.includes('Policy') || 
+                                 eventNameSafe.includes('Secret');
               
               return (
                 <tr key={L.id} className={`${isSuspicious ? 'bg-yellow-50' : ''}`}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{L.event_time ? new Date(L.event_time).toLocaleString() : 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{L.event_name || 'Unknown'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{L.source_ip || 'Unknown'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title={L.principal_id || ''}>{L.principal_id || 'Unknown'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{eventNameSafe}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{String(L.source_ip || 'Unknown')}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate" title={String(L.principal_id || '')}>
+                     {String(L.principal_id || 'Unknown')}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {L.response_status === 'failure' ? 
-                      <span className="text-red-600 font-medium">Failed</span> : 
-                      <span className="text-green-600">Success</span>}
+                    {responseStatusSafe === 'failure' ? 
+                      <span className="text-red-600 font-medium font-bold">Failed</span> : 
+                      <span className="text-green-600 font-medium">Success</span>}
                   </td>
                 </tr>
               )
             })}
-            {(!Array.isArray(logs) || logs.length === 0) && (
+            {safeLogs.length === 0 && (
               <tr><td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">No log events found.</td></tr>
             )}
           </tbody>

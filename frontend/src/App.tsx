@@ -8,29 +8,39 @@ import IAM from './pages/IAM';
 import Logs from './pages/Logs';
 import AttackPaths from './pages/AttackPaths';
 import Upload from './pages/Upload';
+import Report from './pages/Report';
 import { ProjectProvider } from './context/ProjectContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+
+function PrivateRoute({ children }: { children: JSX.Element }) {
+  const { isAuthenticated } = useAuth();
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+}
 
 function App() {
   return (
-    <Router>
-      <ProjectProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+    <AuthProvider>
+      <Router>
+        <ProjectProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/report" element={<PrivateRoute><Report /></PrivateRoute>} />
 
-          <Route path="/" element={<DashboardLayout />}>
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="upload" element={<Upload />} />
-            <Route path="findings" element={<Findings />} />
-            <Route path="scans" element={<Scans />} />
-            <Route path="iam" element={<IAM />} />
-            <Route path="logs" element={<Logs />} />
-            <Route path="attack-paths" element={<AttackPaths />} />
-          </Route>
-        </Routes>
-      </ProjectProvider>
-    </Router>
+            <Route path="/" element={<PrivateRoute><DashboardLayout /></PrivateRoute>}>
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="upload" element={<Upload />} />
+              <Route path="findings" element={<Findings />} />
+              <Route path="scans" element={<Scans />} />
+              <Route path="iam" element={<IAM />} />
+              <Route path="logs" element={<Logs />} />
+              <Route path="attack-paths" element={<AttackPaths />} />
+            </Route>
+          </Routes>
+        </ProjectProvider>
+      </Router>
+    </AuthProvider>
   );
 }
 

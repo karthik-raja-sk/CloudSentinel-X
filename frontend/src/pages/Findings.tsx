@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useProjectContext } from '../context/ProjectContext';
-import { getFindings } from '../api/client';
-import { Loader2, Search, Filter, Shield, AlertTriangle, AlertCircle, Info, ArrowUpDown } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { getFindings, updateFindingStatus } from '../api/client';
+import { Loader2, Search, Filter, Shield, AlertTriangle, AlertCircle, Info, ArrowUpDown, Download } from 'lucide-react';
 
 const SEVERITY_INFO: Record<string, { color: string, icon: any }> = {
   CRITICAL: { color: 'bg-red-100 text-red-800 border-red-200', icon: Shield },
@@ -12,29 +13,95 @@ const SEVERITY_INFO: Record<string, { color: string, icon: any }> = {
 
 export default function Findings() {
   const { selectedProjectId: projectId } = useProjectContext();
+  const { role } = useAuth();
   const [loading, setLoading] = useState(true);
   const [findings, setFindings] = useState<any[]>([]);
   
   // Filters & State
   const [filterType, setFilterType] = useState('ALL');
   const [filterSeverity, setFilterSeverity] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  useEffect(() => {
-    async function fetchFindings() {
-      try {
-        setLoading(true);
-        const data = await getFindings(Number(projectId));
-        setFindings(data);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+  const fetchFindings = async () => {
+    try {
+      setLoading(true);
+      const data = await getFindings(Number(projectId));
+      setFindings(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setFindings([]);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     if (projectId) fetchFindings();
+    else {
+      setFindings([]);
+      setLoading(false);
+    }
   }, [projectId]);
+
+  const handleStatusChange = async (findingId: number, newStatus: string) => {
+    if (role !== 'Admin') return;
+    try {
+      await updateFindingStatus(findingId, newStatus);
+      setFindings(prev => prev.map(f => f && f.id === findingId ? { ...f, remediation_status: newStatus } : f));
+    } catch (err) {
+      console.error('Failed to update status', err);
+    }
+  };
+
+  const safeFindings = Array.isArray(findings) ? findings : [];
+
+  const filteredFindings = safeFindings
+    .filter(f => f && (filterType === 'ALL' || String(f.finding_type || '') === filterType))
+    .filter(f => f && (filterSeverity === 'ALL' || String(f.severity || '') === filterSeverity))
+    .filter(f => f && (filterStatus === 'ALL' || String(f.remediation_status || 'OPEN') === filterStatus))
+    .filter(f => {
+      if (!f) return false;
+      const titleSafe = String(f.title || '').toLowerCase();
+      const descSafe = String(f.description || '').toLowerCase();
+      const querySafe = String(searchQuery || '').toLowerCase();
+      return titleSafe.includes(querySafe) || descSafe.includes(querySafe);
+    })
+    .sort((a, b) => {
+      if (!a || !b) return 0;
+      const scoreA = Number(a.risk_score || 0);
+      const scoreB = Number(b.risk_score || 0);
+      if (sortOrder === 'asc') return scoreA - scoreB;
+      return scoreB - scoreA;
+    });
+
+  const exportCSV = () => {
+    const headers = ['ID', 'Severity', 'Type', 'Title', 'Status', 'Recommendation', 'Masked Preview'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredFindings.map(f => {
+        if (!f) return '';
+        return [
+          f.id,
+          f.severity,
+          f.finding_type,
+          `"${String(f.title || '').replace(/"/g, '""')}"`,
+          f.remediation_status || 'OPEN',
+          `"${String(f.recommendation_type || '').replace(/"/g, '""')}"`,
+          `"${String(f.sample_masked_value || '').replace(/"/g, '""')}"`
+        ].join(',');
+      }).filter(Boolean)
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'cloudsentinel_findings_export.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   if (loading) {
     return (
@@ -44,24 +111,7 @@ export default function Findings() {
     );
   }
 
-  // Filter and Sort Logic
   const [previewFinding, setPreviewFinding] = useState<any>(null);
-
-  const safeFindings = Array.isArray(findings) ? findings : [];
-
-  const filteredFindings = safeFindings
-    .filter(f => filterType === 'ALL' || f.finding_type === filterType)
-    .filter(f => filterSeverity === 'ALL' || f.severity === filterSeverity)
-    .filter(f => {
-      const titleSafe = (f.title || '').toLowerCase();
-      const descSafe = (f.description || '').toLowerCase();
-      const querySafe = (searchQuery || '').toLowerCase();
-      return titleSafe.includes(querySafe) || descSafe.includes(querySafe);
-    })
-    .sort((a, b) => {
-      if (sortOrder === 'asc') return (a.risk_score || 0) - (b.risk_score || 0);
-      return (b.risk_score || 0) - (a.risk_score || 0);
-    });
 
   return (
     <div className="pb-10">
@@ -90,9 +140,9 @@ export default function Findings() {
             <select 
               value={filterSeverity} 
               onChange={e => setFilterSeverity(e.target.value)}
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border"
+              className="block w-full pl-3 pr-8 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border"
             >
-              <option value="ALL">All Severities</option>
+              <option value="ALL">Severities</option>
               <option value="CRITICAL">Critical</option>
               <option value="HIGH">High</option>
               <option value="MEDIUM">Medium</option>
@@ -104,14 +154,27 @@ export default function Findings() {
              <select 
               value={filterType} 
               onChange={e => setFilterType(e.target.value)}
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border"
+              className="block w-full pl-3 pr-8 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border"
             >
-              <option value="ALL">All Types</option>
+              <option value="ALL">Types</option>
               <option value="misconfiguration">Misconfiguration</option>
               <option value="iam_risk">IAM Risk</option>
               <option value="secret">Secret</option>
               <option value="pii_exposure">PII Exposure</option>
               <option value="log_threat">Log Threat</option>
+            </select>
+          </div>
+
+          <div className="flex items-center space-x-2 w-full md:w-auto">
+             <select 
+              value={filterStatus} 
+              onChange={e => setFilterStatus(e.target.value)}
+              className="block w-full pl-3 pr-8 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md border"
+            >
+              <option value="ALL">Status</option>
+              <option value="OPEN">Open</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="RESOLVED">Resolved</option>
             </select>
           </div>
 
@@ -121,6 +184,14 @@ export default function Findings() {
           >
             <ArrowUpDown className="w-4 h-4 mr-2 text-gray-500" />
             Sort Score
+          </button>
+
+          <button 
+            onClick={exportCSV}
+            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-bold rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
           </button>
         </div>
       </div>
@@ -137,25 +208,27 @@ export default function Findings() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredFindings.map((f: any) => {
-              const sevInfo = SEVERITY_INFO[f.severity] || SEVERITY_INFO['LOW'];
+              if (!f) return null;
+              const sevKey = String(f.severity || 'LOW').toUpperCase();
+              const sevInfo = SEVERITY_INFO[sevKey] || SEVERITY_INFO['LOW'];
               const Icon = sevInfo.icon;
               return (
                 <tr key={f.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-5 whitespace-nowrap">
                     <span className={`px-3 py-1.5 inline-flex items-center text-xs font-bold rounded-md border mb-2 block w-max ${sevInfo.color}`}>
                       <Icon className="w-3.5 h-3.5 mr-1.5" />
-                      {f.severity}
+                      {String(f.severity || 'LOW')}
                     </span>
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 capitalize">
-                      {f.finding_type?.replace('_', ' ')}
+                      {String(f.finding_type || 'Unknown').replace('_', ' ')}
                     </span>
                   </td>
                   <td className="px-6 py-5 max-w-md">
-                    <div className="text-sm font-bold text-gray-900 truncate">{f.title}</div>
-                    <div className="text-sm text-gray-500 line-clamp-2 mt-1">{f.description || 'No detailed description provided.'}</div>
+                    <div className="text-sm font-bold text-gray-900 truncate">{String(f.title || 'Unknown Risk')}</div>
+                    <div className="text-sm text-gray-500 line-clamp-2 mt-1">{String(f.description || 'No detailed description provided.')}</div>
                     {f.sample_masked_value && (
                        <div className="mt-2 text-xs font-mono bg-gray-100 p-2 rounded text-indigo-700 border border-gray-200 inline-block">
-                         Masked Preview: <span className="font-bold">{f.sample_masked_value}</span>
+                         Masked Preview: <span className="font-bold">{String(f.sample_masked_value)}</span>
                        </div>
                     )}
                   </td>
@@ -163,15 +236,26 @@ export default function Findings() {
                     {f.recommendation_type ? (
                       <div className="bg-green-50 rounded p-3 border border-green-100">
                         <span className="text-xs font-bold text-green-800 uppercase tracking-wider bg-green-200 px-2 py-1 rounded inline-block mb-1">
-                          ↳ Action: {f.recommendation_type.replace('_', ' ')}
+                          ↳ Action: {String(f.recommendation_type).replace('_', ' ')}
                         </span>
-                        <p className="text-xs text-green-700 mt-1 leading-snug">{f.remediation_text || f.remediation}</p>
+                        <p className="text-xs text-green-700 mt-1 leading-snug">{String(f.remediation_text || f.remediation || '')}</p>
                       </div>
                     ) : (
                       <div className="text-sm text-gray-500 italic">No specific action modeled natively.</div>
                     )}
                   </td>
-                  <td className="px-6 py-5 whitespace-nowrap text-right">
+                  <td className="px-6 py-5 whitespace-nowrap text-right space-x-2">
+                     {role === 'Admin' && (
+                       <select 
+                         value={String(f.remediation_status || 'OPEN')}
+                         onChange={(e) => handleStatusChange(f.id, e.target.value)}
+                         className="inline-flex items-center px-2 py-1.5 border border-gray-300 text-xs font-bold rounded text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                       >
+                         <option value="OPEN">Mark Open</option>
+                         <option value="IN_PROGRESS">In Progress</option>
+                         <option value="RESOLVED">Resolved</option>
+                       </select>
+                     )}
                      <button 
                        onClick={() => setPreviewFinding(f)}
                        className="inline-flex items-center px-3 py-1.5 bg-indigo-50 text-indigo-700 font-medium text-xs rounded hover:bg-indigo-100 transition"
@@ -220,21 +304,21 @@ export default function Findings() {
                        <div className="bg-gray-50 border border-gray-200 rounded p-4 mb-4">
                           <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Original Exposed Node</h4>
                           <code className="text-sm text-red-600 bg-red-50 p-2 rounded block break-all">
-                             {previewFinding.evidence || 'N/A'}
+                             {String(previewFinding.evidence || 'N/A')}
                           </code>
                        </div>
                        
                        <div className="bg-indigo-50 border border-indigo-200 rounded p-4 mb-4">
                           <h4 className="text-xs font-bold text-indigo-500 uppercase mb-2">Safe Masked Implementation Result</h4>
                           <code className="text-sm text-indigo-800 bg-indigo-100 p-2 rounded block font-bold">
-                             {previewFinding.sample_masked_value || 'No masked output generated internally.'}
+                             {String(previewFinding.sample_masked_value || 'No masked output generated internally.')}
                           </code>
                        </div>
                        
                        {previewFinding.recommendation_type && (
                           <div className="bg-green-50 border border-green-200 rounded p-4">
-                              <h4 className="text-xs font-bold text-green-700 uppercase mb-2">Policy: {previewFinding.recommendation_type.replace('_', ' ')}</h4>
-                              <p className="text-sm text-green-800">{previewFinding.remediation_text}</p>
+                              <h4 className="text-xs font-bold text-green-700 uppercase mb-2">Policy: {String(previewFinding.recommendation_type).replace('_', ' ')}</h4>
+                              <p className="text-sm text-green-800">{String(previewFinding.remediation_text || '')}</p>
                           </div>
                        )}
                     </div>

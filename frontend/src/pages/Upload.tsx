@@ -1,24 +1,42 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjectContext } from '../context/ProjectContext';
+import { useAuth } from '../context/AuthContext';
 import { uploadFile, getScanStatus } from '../api/client';
-import { UploadCloud, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { UploadCloud, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 
 export default function Upload() {
   const { selectedProjectId: projectId } = useProjectContext();
+  const { role } = useAuth();
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [scanState, setScanState] = useState<{ scanId?: number; status?: string; error?: string }>({});
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setValidationError(null);
     if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      
+      if (!selectedFile.name.endsWith('.json')) {
+         setValidationError('Invalid file type. Only .json architectures are supported.');
+         setFile(null);
+         return;
+      }
+      
+      if (selectedFile.size > 10 * 1024 * 1024) {
+         setValidationError('File size exceeds the 10MB architectural parsing limit.');
+         setFile(null);
+         return;
+      }
+      
+      setFile(selectedFile);
     }
   };
 
   const handleUpload = async () => {
-    if (!file || !projectId) return;
+    if (!file || !projectId || role !== 'Admin') return;
     setIsUploading(true);
     setScanState({});
     
@@ -78,13 +96,26 @@ export default function Upload() {
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-6 border border-gray-200 rounded-md p-2"
             />
             
-            <button 
-              onClick={handleUpload}
-              disabled={!file}
-              className={`w-full py-2 px-4 rounded shadow-sm font-medium text-white transition ${file ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
-            >
-              Start Security Scan
-            </button>
+            {validationError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center text-left text-sm text-red-700">
+                <AlertCircle className="w-5 h-5 text-red-500 mr-2 flex-shrink-0" />
+                {validationError}
+              </div>
+            )}
+
+            {role === 'Analyst' ? (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 text-left mb-6 font-bold">
+                 You are logged in as an Analyst. Upload permissions are restricted to Admins.
+              </div>
+            ) : (
+                <button 
+                  onClick={handleUpload}
+                  disabled={!file}
+                  className={`w-full py-2 px-4 rounded shadow-sm font-medium text-white transition ${file ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'}`}
+                >
+                  Start Security Scan
+                </button>
+            )}
           </>
         )}
 

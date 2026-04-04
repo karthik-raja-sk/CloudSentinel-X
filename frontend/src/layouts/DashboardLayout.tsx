@@ -1,7 +1,9 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useProjectContext } from '../context/ProjectContext';
+import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
-import { Loader2, PlusCircle, AlertCircle } from 'lucide-react';
+import { Loader2, PlusCircle, AlertCircle, Shield } from 'lucide-react';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function DashboardLayout() {
   const { 
@@ -12,6 +14,7 @@ export default function DashboardLayout() {
     error,
     handleCreateProject
   } = useProjectContext();
+  const { role, logout } = useAuth();
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,6 +22,7 @@ export default function DashboardLayout() {
   const [isCreating, setIsCreating] = useState(false);
 
   const handleLogout = () => {
+    logout();
     navigate('/login');
   };
 
@@ -100,19 +104,27 @@ export default function DashboardLayout() {
     <div className="flex h-screen bg-gray-100">
       <div className="w-64 bg-dark text-white p-4 hidden md:block border-r border-gray-800 shrink-0">
         <h1 className="text-2xl font-bold text-blue-500 mb-8 px-2 tracking-tight">CloudSentinel X</h1>
-        <nav className="space-y-2">
-          {['dashboard', 'upload', 'findings', 'iam', 'logs', 'attack-paths'].map(route => (
-             <Link 
-                key={route}
-                to={`/${route}`} 
-                className={`block px-3 py-2.5 rounded-lg transition font-medium capitalize ${location.pathname === `/${route}` ? 'bg-blue-600 text-white shadow-sm' : 'hover:bg-gray-800 text-gray-300 hover:text-white'}`}
-              >
-                {route.replace('-', ' ')}
-            </Link>
-          ))}
-          <div className="pt-4 mt-4 border-t border-gray-800">
-             <Link to="/scans" className={`block px-3 py-2 rounded transition text-sm ${location.pathname === `/scans` ? 'text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}>Scan History</Link>
-          </div>
+        <nav className="space-y-2 flex flex-col h-[calc(100vh-100px)]">
+           <div className="flex-1">
+             {['dashboard', 'upload', 'findings', 'iam', 'logs', 'attack-paths'].map(route => (
+                <Link 
+                   key={route}
+                   to={`/${route}`} 
+                   className={`block px-3 py-2.5 rounded-lg transition font-medium capitalize mb-1 ${location.pathname === `/${route}` ? 'bg-blue-600 text-white shadow-sm' : 'hover:bg-gray-800 text-gray-300 hover:text-white'}`}
+                 >
+                   {route.replace('-', ' ')}
+               </Link>
+             ))}
+             <div className="pt-4 mt-4 border-t border-gray-800">
+                <Link to="/scans" className={`block px-3 py-2 rounded transition text-sm ${location.pathname === `/scans` ? 'text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}>Scan History</Link>
+             </div>
+           </div>
+
+           <div className="mt-auto">
+              <Link to="/report" target="_blank" className="flex items-center justify-center w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition text-sm">
+                 <Shield className="w-4 h-4 mr-2" /> Export PDF Report
+              </Link>
+           </div>
         </nav>
       </div>
       
@@ -132,13 +144,17 @@ export default function DashboardLayout() {
           </div>
           
           <div className="flex items-center space-x-4">
-            <span className="text-sm text-gray-500 font-medium">Admin User</span>
-            <button onClick={handleLogout} className="text-sm bg-gray-100 hover:bg-gray-200 transition text-gray-700 px-4 py-1.5 rounded-md shadow-sm font-bold">Logout</button>
+            <span className={`text-xs font-bold px-2 py-1 rounded border uppercase tracking-wider ${role === 'Admin' ? 'bg-indigo-100 text-indigo-800 border-indigo-200' : 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+              Role: {role}
+            </span>
+            <button onClick={handleLogout} className="text-sm bg-gray-100 hover:bg-gray-200 transition text-gray-700 px-4 py-1.5 rounded-md shadow-sm font-bold border border-gray-200">Logout</button>
           </div>
         </header>
         
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6 scroll-smooth">
-          <Outlet />
+          <ErrorBoundary key={location.pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>
