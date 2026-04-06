@@ -12,19 +12,21 @@ router = APIRouter()
 
 @router.get("/project/{project_id}", response_model=List[IamEntityResponse])
 def get_project_iam_entities(project_id: int, db: Session = Depends(get_db)):
-    entities = db.query(IamEntity).filter(IamEntity.project_id == project_id).all()
+    latest_scan = db.query(Scan).filter(Scan.project_id == project_id, Scan.scan_type == "CONFIG_UPLOAD").order_by(Scan.id.desc()).first()
+    if not latest_scan:
+        return []
+    entities = db.query(IamEntity).filter(IamEntity.project_id == project_id, IamEntity.scan_id == latest_scan.id).all()
     return entities
 
 @router.get("/findings/project/{project_id}", response_model=List[FindingResponse])
 def get_project_iam_findings(project_id: int, db: Session = Depends(get_db)):
-    scans = db.query(Scan.id).filter(Scan.project_id == project_id).all()
-    scan_ids = [s.id for s in scans]
+    latest_scan = db.query(Scan).filter(Scan.project_id == project_id, Scan.scan_type == "CONFIG_UPLOAD").order_by(Scan.id.desc()).first()
     
-    if not scan_ids:
+    if not latest_scan:
         return []
         
     findings = db.query(Finding).filter(
-        Finding.scan_id.in_(scan_ids),
+        Finding.scan_id == latest_scan.id,
         Finding.finding_type == "iam_risk"
     ).order_by(Finding.risk_score.desc()).all()
     return findings

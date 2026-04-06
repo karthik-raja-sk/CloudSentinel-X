@@ -106,7 +106,7 @@ export default function DashboardLayout() {
         <h1 className="text-2xl font-bold text-blue-500 mb-8 px-2 tracking-tight">CloudSentinel X</h1>
         <nav className="space-y-2 flex flex-col h-[calc(100vh-100px)]">
            <div className="flex-1">
-             {['dashboard', 'upload', 'findings', 'iam', 'logs', 'attack-paths'].map(route => (
+             {['dashboard', 'upload', 'findings', 'malware', 'data-leaks', 'incidents', 'iam', 'logs', 'attack-paths'].map(route => (
                 <Link 
                    key={route}
                    to={`/${route}`} 

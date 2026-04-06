@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, health, projects, scans, uploads, findings, dashboard, iam, logs, attack_paths, analytics, redaction
+from app.api.v1.endpoints import auth, health, projects, scans, uploads, findings, dashboard, iam, logs, attack_paths, analytics, redaction, malware, data_leaks, incidents
 
 api_router = APIRouter()
 api_router.include_router(health.router, prefix="/health", tags=["health"])
@@ -14,3 +14,6 @@ api_router.include_router(logs.router, prefix="/logs", tags=["logs"])
 api_router.include_router(attack_paths.router, prefix="/attack-paths", tags=["attack_paths"])
 api_router.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(redaction.router, prefix="/redaction", tags=["redaction"])
+api_router.include_router(malware.router, prefix="/malware", tags=["malware"])
+api_router.include_router(data_leaks.router, prefix="/data-leaks", tags=["data-leaks"])
+api_router.include_router(incidents.router, prefix="/incidents", tags=["incidents"])

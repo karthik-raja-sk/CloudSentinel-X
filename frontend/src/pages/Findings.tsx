@@ -23,6 +23,7 @@ export default function Findings() {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [previewFinding, setPreviewFinding] = useState<any>(null);
 
   const fetchFindings = async () => {
     try {
@@ -110,8 +111,6 @@ export default function Findings() {
       </div>
     );
   }
-
-  const [previewFinding, setPreviewFinding] = useState<any>(null);
 
   return (
     <div className="pb-10">

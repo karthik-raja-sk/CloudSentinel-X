@@ -8,3 +8,4 @@ from app.models.iam_entity import IamEntity
 from app.models.finding import Finding
 from app.models.log_event import LogEvent
 from app.models.attack_path import AttackPath
+from app.models.incident import Incident

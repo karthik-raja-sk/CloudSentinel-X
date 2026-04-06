@@ -10,13 +10,12 @@ router = APIRouter()
 
 @router.get("/project/{project_id}", response_model=List[AttackPathResponse])
 def get_project_attack_paths(project_id: int, db: Session = Depends(get_db)):
-    scans = db.query(Scan.id).filter(Scan.project_id == project_id).all()
-    scan_ids = [s.id for s in scans]
+    latest_scan = db.query(Scan).filter(Scan.project_id == project_id, Scan.scan_type == "CONFIG_UPLOAD").order_by(Scan.id.desc()).first()
     
-    if not scan_ids:
+    if not latest_scan:
         return []
         
     paths = db.query(AttackPath).filter(
-        AttackPath.scan_id.in_(scan_ids)
+        AttackPath.scan_id == latest_scan.id
     ).order_by(AttackPath.risk_score.desc()).all()
     return paths

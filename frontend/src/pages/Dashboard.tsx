@@ -81,7 +81,10 @@ export default function Dashboard() {
     scan_trend = [],
     cloud_misconfig_count = 0,
     pii_exposure_count = 0,
-    findings_needing_remediation = 0
+    findings_needing_remediation = 0,
+    malware_count = 0,
+    data_leaks_count = 0,
+    critical_incidents_count = 0
   } = stats;
 
   const pieData = Object.keys(severity_distribution)
@@ -123,54 +126,44 @@ export default function Dashboard() {
       ) : (
         <>
           {/* Top Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition-shadow">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/malware')}>
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Total Findings</h3>
-                  <p className="text-3xl font-extrabold text-gray-900 mt-2">{total_findings}</p>
+                  <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider">Malware Files</h3>
+                  <p className="text-3xl font-extrabold text-gray-900 mt-2">{malware_count}</p>
                 </div>
-                <div className="bg-indigo-100 p-3 rounded-lg"><Activity className="w-6 h-6 text-indigo-600" /></div>
+                <div className="bg-red-100 p-3 rounded-lg"><Activity className="w-6 h-6 text-red-600" /></div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-l-red-500 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-l-orange-500 flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/data-leaks')}>
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-red-500 text-xs font-bold uppercase tracking-wider">Needs Remediation</h3>
-                  <p className="text-3xl font-extrabold text-gray-900 mt-2">{findings_needing_remediation}</p>
-                </div>
-                <div className="bg-red-100 p-3 rounded-lg"><ShieldAlert className="w-6 h-6 text-red-600" /></div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-l-orange-500 flex flex-col justify-between hover:shadow-md transition-shadow">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-orange-500 text-xs font-bold uppercase tracking-wider">PII Exposure</h3>
-                  <p className="text-3xl font-extrabold text-gray-900 mt-2">{pii_exposure_count}</p>
+                  <h3 className="text-orange-500 text-xs font-bold uppercase tracking-wider">Data Leaks</h3>
+                  <p className="text-3xl font-extrabold text-gray-900 mt-2">{data_leaks_count}</p>
                 </div>
                 <div className="bg-orange-100 p-3 rounded-lg"><AlertTriangle className="w-6 h-6 text-orange-600" /></div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-l-blue-500 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-l-purple-500 flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/incidents')}>
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-blue-500 text-xs font-bold uppercase tracking-wider">Cloud Misconfigs</h3>
-                  <p className="text-3xl font-extrabold text-gray-900 mt-2">{cloud_misconfig_count}</p>
+                  <h3 className="text-purple-500 text-xs font-bold uppercase tracking-wider">Critical Incidents</h3>
+                  <p className="text-3xl font-extrabold text-gray-900 mt-2">{critical_incidents_count}</p>
                 </div>
-                <div className="bg-blue-100 p-3 rounded-lg"><Shield className="w-6 h-6 text-blue-600" /></div>
+                <div className="bg-purple-100 p-3 rounded-lg"><ShieldAlert className="w-6 h-6 text-purple-600" /></div>
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-l-yellow-500 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-l-blue-500 flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/findings')}>
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-yellow-600 text-xs font-bold uppercase tracking-wider">Medium / Low Risks</h3>
-                  <p className="text-3xl font-extrabold text-gray-900 mt-2">{(severity_distribution.MEDIUM || 0) + (severity_distribution.LOW || 0)}</p>
+                  <h3 className="text-blue-500 text-xs font-bold uppercase tracking-wider">Total Findings</h3>
+                  <p className="text-3xl font-extrabold text-gray-900 mt-2">{total_findings}</p>
                 </div>
-                <div className="bg-yellow-100 p-3 rounded-lg"><AlertCircle className="w-6 h-6 text-yellow-600" /></div>
+                <div className="bg-blue-100 p-3 rounded-lg"><Shield className="w-6 h-6 text-blue-600" /></div>
               </div>
             </div>
           </div>

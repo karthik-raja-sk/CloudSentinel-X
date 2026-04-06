@@ -1,0 +1,2 @@
+This is a completely safe text file that doesn't contain any sensitive information or malicious content.
+It is perfectly fine to have this in the S3 bucket.

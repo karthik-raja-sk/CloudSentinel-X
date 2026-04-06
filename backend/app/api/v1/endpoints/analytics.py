@@ -5,6 +5,7 @@ from app.db.session import get_db
 from app.models.scan import Scan
 from app.models.finding import Finding
 from app.models.project import Project
+from app.models.incident import Incident
 from typing import Dict, Any
 from datetime import datetime, timedelta
 
@@ -21,7 +22,18 @@ def get_analytics_summary(project_id: int, db: Session = Depends(get_db)):
     total_scans = db.query(Scan).filter(Scan.project_id == project_id).count()
 
     # Base query for findings in this project
-    findings_q = db.query(Finding).join(Scan).filter(Scan.project_id == project_id)
+    scan_types = ["CONFIG_UPLOAD", "FILE_SCAN", "DATA_LEAK_SCAN"]
+    latest_scan_ids = []
+    for stype in scan_types:
+        latest = db.query(Scan.id).filter(Scan.project_id == project_id, Scan.scan_type == stype).order_by(Scan.id.desc()).first()
+        if latest:
+            latest_scan_ids.append(latest.id)
+            
+    if not latest_scan_ids:
+        findings_q = db.query(Finding).filter(False) # Empty query
+    else:
+        findings_q = db.query(Finding).filter(Finding.scan_id.in_(latest_scan_ids))
+        
     total_findings = findings_q.count()
 
     # Severity Distribution
@@ -31,8 +43,7 @@ def get_analytics_summary(project_id: int, db: Session = Depends(get_db)):
         "MEDIUM": 0,
         "LOW": 0
     }
-    severity_counts = db.query(Finding.severity, func.count(Finding.id))\
-        .join(Scan).filter(Scan.project_id == project_id)\
+    severity_counts = findings_q.with_entities(Finding.severity, func.count(Finding.id))\
         .group_by(Finding.severity).all()
         
     for sev, count in severity_counts:
@@ -41,8 +52,7 @@ def get_analytics_summary(project_id: int, db: Session = Depends(get_db)):
 
     # Findings by Type
     findings_by_type = {}
-    type_counts = db.query(Finding.finding_type, func.count(Finding.id))\
-        .join(Scan).filter(Scan.project_id == project_id)\
+    type_counts = findings_q.with_entities(Finding.finding_type, func.count(Finding.id))\
         .group_by(Finding.finding_type).all()
         
     for ftype, count in type_counts:
@@ -65,21 +75,18 @@ def get_analytics_summary(project_id: int, db: Session = Depends(get_db)):
         })
 
     # Cloud Config & PII Exact Counts
-    cloud_misconfig_count = db.query(Finding).join(Scan).filter(
-        Scan.project_id == project_id,
-        Finding.finding_type == 'misconfiguration'
-    ).count()
+    cloud_misconfig_count = findings_q.filter(Finding.finding_type == 'misconfiguration').count()
+    pii_exposure_count = findings_q.filter(Finding.finding_type == 'pii_exposure').count()
+    malware_count = findings_q.filter(Finding.finding_type == 'malware').count()
+    data_leaks_count = findings_q.filter(Finding.finding_type == 'data_leak').count()
 
-    pii_exposure_count = db.query(Finding).join(Scan).filter(
-        Scan.project_id == project_id,
-        Finding.finding_type == 'pii_exposure'
+    critical_incidents_count = db.query(Incident).filter(
+        Incident.project_id == project_id,
+        Incident.severity == 'CRITICAL'
     ).count()
 
     # Needing remediation (Proxy: any finding with recommendation_type mapped)
-    findings_needing_remediation = db.query(Finding).join(Scan).filter(
-        Scan.project_id == project_id,
-        Finding.recommendation_type.is_not(None)
-    ).count()
+    findings_needing_remediation = findings_q.filter(Finding.recommendation_type.is_not(None)).count()
 
     return {
         "total_scans": total_scans,
@@ -89,5 +96,8 @@ def get_analytics_summary(project_id: int, db: Session = Depends(get_db)):
         "scan_trend": scan_trend,
         "cloud_misconfig_count": cloud_misconfig_count,
         "pii_exposure_count": pii_exposure_count,
+        "malware_count": malware_count,
+        "data_leaks_count": data_leaks_count,
+        "critical_incidents_count": critical_incidents_count,
         "findings_needing_remediation": findings_needing_remediation
     }

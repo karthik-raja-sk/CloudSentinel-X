@@ -10,13 +10,17 @@ router = APIRouter()
 
 @router.get("/project/{project_id}", response_model=List[FindingResponse])
 def get_project_findings(project_id: int, type: Optional[str] = None, db: Session = Depends(get_db)):
-    scans = db.query(Scan.id).filter(Scan.project_id == project_id).all()
-    scan_ids = [s.id for s in scans]
-    
-    if not scan_ids:
+    scan_types = ["CONFIG_UPLOAD", "FILE_SCAN", "DATA_LEAK_SCAN"]
+    latest_scan_ids = []
+    for stype in scan_types:
+        latest = db.query(Scan.id).filter(Scan.project_id == project_id, Scan.scan_type == stype).order_by(Scan.id.desc()).first()
+        if latest:
+            latest_scan_ids.append(latest.id)
+            
+    if not latest_scan_ids:
         return []
         
-    query = db.query(Finding).filter(Finding.scan_id.in_(scan_ids))
+    query = db.query(Finding).filter(Finding.scan_id.in_(latest_scan_ids))
     if type:
         query = query.filter(Finding.finding_type == type)
         

@@ -1,0 +1,144 @@
+{
+  "project_name": "CloudSentinel X Advanced Incident Test",
+  "account_id": "123456789012",
+  "region": "us-east-1",
+  "scan_context": {
+    "public_exposure": true,
+    "suspected_malware_present": true,
+    "sensitive_data_exposed": true,
+    "correlation_hint": "public_bucket_plus_malware_plus_pii"
+  },
+  "resources": {
+    "s3_buckets": [
+      {
+        "name": "customer-backup-prod",
+        "public_read": true,
+        "public_write": true,
+        "encryption_enabled": false,
+        "versioning_enabled": false,
+        "contains_sensitive_data": true,
+        "notes": "Public bucket intentionally unsafe for incident correlation testing"
+      }
+    ],
+    "uploaded_files": [
+      {
+        "file_name": "invoice_update.exe",
+        "file_path": "s3://customer-backup-prod/uploads/invoice_update.exe",
+        "extension": ".exe",
+        "mime_type": "application/x-msdownload",
+        "sha256": "7f3a9d2b6a5c8e1d9f4b7a2c3d6e8f1a9b0c7d6e5f4a3b2c1d9e8f7a6b5c4d3",
+        "malware_signals": [
+          "suspicious_extension",
+          "known_bad_pattern",
+          "unsigned_binary"
+        ],
+        "risk_level": "critical"
+      },
+      {
+        "file_name": "employees_pii.csv",
+        "file_path": "s3://customer-backup-prod/hr/employees_pii.csv",
+        "extension": ".csv",
+        "mime_type": "text/csv",
+        "contains_pii": true,
+        "sample_records": [
+          {
+            "name": "Asha",
+            "email": "asha.krishnan@example.com",
+            "phone": "9876543210",
+            "aadhaar": "2345 6789 1234"
+          },
+          {
+            "name": "Rahul",
+            "email": "rahul.ops@example.com",
+            "phone": "9123456780",
+            "aadhaar": "3456 7890 2345"
+          }
+        ],
+        "embedded_secrets": [
+          {
+            "type": "aws_access_key",
+            "value": "AKIAIOSFODNN7EXAMPLE"
+          },
+          {
+            "type": "password",
+            "value": "ProdBackup@123"
+          }
+        ]
+      }
+    ],
+    "security_groups": [
+      {
+        "group_id": "sg-0abc1234def567890",
+        "name": "public-admin-access",
+        "inbound_rules": [
+          {
+            "port": 22,
+            "protocol": "tcp",
+            "cidr": "0.0.0.0/0"
+          },
+          {
+            "port": 3389,
+            "protocol": "tcp",
+            "cidr": "0.0.0.0/0"
+          },
+          {
+            "port": 443,
+            "protocol": "tcp",
+            "cidr": "0.0.0.0/0"
+          }
+        ]
+      }
+    ],
+    "iam_users": [
+      {
+        "user_name": "john.devops",
+        "mfa_enabled": false,
+        "access_keys_active": 2,
+        "admin_privileges": true,
+        "unused_days": 180
+      }
+    ]
+  },
+  "cloudtrail_like_events": [
+    {
+      "eventTime": "2026-04-06T10:30:00Z",
+      "eventName": "ConsoleLogin",
+      "sourceIPAddress": "185.123.45.67",
+      "userName": "john.devops",
+      "result": "Failure"
+    },
+    {
+      "eventTime": "2026-04-06T10:30:05Z",
+      "eventName": "ConsoleLogin",
+      "sourceIPAddress": "185.123.45.67",
+      "userName": "john.devops",
+      "result": "Failure"
+    },
+    {
+      "eventTime": "2026-04-06T10:31:00Z",
+      "eventName": "ConsoleLogin",
+      "sourceIPAddress": "185.123.45.67",
+      "userName": "john.devops",
+      "result": "Success"
+    }
+  ],
+  "expected_findings": {
+    "misconfigurations": [
+      "Public bucket",
+      "Unencrypted storage",
+      "Open admin ports",
+      "MFA disabled"
+    ],
+    "malware": [
+      "Suspicious executable detected"
+    ],
+    "data_leaks": [
+      "Email addresses detected",
+      "Phone numbers detected",
+      "Aadhaar-like numbers detected",
+      "AWS key detected",
+      "Password pattern detected"
+    ],
+    "correlated_incident": "Critical incident should be generated from public bucket + malware file + sensitive data exposure"
+  }
+}
