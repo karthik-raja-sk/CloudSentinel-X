@@ -1,190 +1,113 @@
-<div align="center">
-  <br />
-    <img src="https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge" alt="Status" />
-    <img src="https://img.shields.io/badge/Build-Passing-brightgreen?style=for-the-badge" alt="Build" />
-    <img src="https://img.shields.io/badge/Security-A%2B-blue?style=for-the-badge" alt="Security" />
-  <br />
-  
-  # CloudSentinel X 🛡️
-  
-  **AI-Powered Cloud Posture & Threat Detection Platform**
 
-  An advanced, automated cloud security suite designed to parse real-time architectural configurations and logs, actively hunting out misconfigurations, hijacked identities, and layered privilege escalation paths before exploitation occurs.
-  
-  [Key Features](#key-features) •
-  [Architecture](#architecture-overview) •
-  [Attack Path Engine](#the-attack-path-engine) •
-  [Installation](#setup-instructions) •
-  [Screenshots](#screenshots)
-</div>
+🛡️ CloudSentinel X
+Enterprise-Grade AI-Driven Cloud Security & Threat Hunting Platform
 
----
+📖 Overview
+CloudSentinel X is an advanced cloud security posture management (CSPM) and threat detection platform inspired by enterprise ecosystems like AWS Security Hub. Built to protect critical cloud workloads, it autonomously scans for infrastructure misconfigurations, storage malware, and sensitive data exposures (PII/Secrets). At its core, an intelligent Risk Correlation Engine fuses disparate alerts into actionable incident reports and clear visual attack paths.
 
-## 1. Project Overview
-**CloudSentinel X** is a modern Security Posture Management (CSPM) and Cloud Infrastructure Entitlement Management (CIEM) solution. Designed from the ground up to reflect enterprise-grade security engineering, it acts as an intelligent correlator that digests AWS JSON configuration state drops or raw audit logs, pushing them through a segmented **Asynchronous Processing** pipeline.
-
-### Why This Project Matters
-**CloudSentinel X** goes beyond traditional security scanners by correlating isolated vulnerabilities into complete attack paths. This enables security teams to prioritize real threats instead of handling disconnected alerts. 
-
-By automatically mapping disjointed vulnerabilities into singular, coherent "Exploitation Chains", CloudSentinel X replicates the exact mindset of an advanced persistent threat (APT)—giving blue teams the visual topology required to patch critical gaps instantly.
-
----
-
-## 2. Key Differentiator
-CloudSentinel X does not just detect vulnerabilities. 
-
-It correlates them into real-world exploit chains, helping identify exactly how attackers can move laterally across cloud systems instead of just throwing isolated noise.
-
----
-
-## 3. The Problem Statement
-In modern **Cloud Security** ecosystems, a single vulnerability is rarely enough to breach an organization. Modern breaches occur through **chained toxic combinations**:
-
-* An S3 bucket is accidentally made public *(Misconfiguration)*.
-* The bucket holds an exposed, hardcoded DevOps API key *(Secret Exposure)*.
-* The key provides broad `sts:AssumeRole` capabilities *(IAM Risk)*.
-* A foreign IP utilizes the key, silently disabling MFA *(Log Threat)*.
-
-Standard security tools flag these as four separate, disconnected low-priority alerts resulting in alert fatigue. CloudSentinel X solves this by linking them contextually through advanced **Risk Correlation**.
-
----
-
-## 4. Key Features
-
-*   **⚡ Automated Posture Scanning:** Instantaneous parsing of complex Cloud configuration blobs mapping to security baselines.
-*   **🔑 CIEM & IAM Privilege Analysis:** Resolves attached vs. inline IAM policies to flag "Shadow Admins", wide `*` wildcards, and inactive MFA states.
-*   **🕵️ Secret Exposure Engine:** Heuristic deep-scans discovering embedded RSA keys, AWS access secrets, and database credentials inside unstructured asset payloads.
-*   **📜 Real-Time Threat Intel (Audit Logs):** Ingests and correlates CloudTrail-esque logs, mapping suspicious IPs, burst deletion events, and privilege manipulation.
-*   **🕸️ Graph-Based Attack Correlation:** Deterministically maps edges between discrete network entities, visualizing lateral movement possibilities without needing heavy GraphDB compute.
-
----
-
-## 5. Architecture Overview
-
-CloudSentinel X runs on a strictly modular, decoupled, and highly concurrent micro-architecture designed for horizontal scalability:
-
-*   **Frontend:** React/TypeScript SPA Dashboard built cleanly via Tailwind CSS.
-*   **API Gateway:** High-throughput Python FastAPI endpoints orchestrating asynchronous database commits.
-*   **Broker & Workers:** Extremely heavy scan parsing and graph generation logic are offloaded to background Celery workers utilizing Redis message brokering to free up thread resources.
-*   **Database:** PostgreSQL / SQLite Relational schema storage via SQLAlchemy handling complex entity grouping cleanly. 
-
----
-
-## 6. The Attack Path Engine 🎯
-*Highlight of the platform.* 
-
-Rather than merely outputting lists of bad configuration states, the custom **Attack Path Engine** runs continuous cyclic sweeps over all fresh findings upon scan completion. 
-
-It maps nodes (External Actors, Storage Assets, Identities) against weighted exploitation rules representing true **Risk Correlation**. 
-
-**Result:** It generates complex Graph-like topologies directly into a lightweight JSON schema, natively rendering visual, layered attack simulations without visualizing heavy, third-party limitations.
-
----
-
-## 7. Tech Stack
-
-| Domain | Technology |
-| :--- | :--- |
-| **Frontend** | React, TypeScript, Vite, TailwindCSS |
-| **Backend API**| Python, FastAPI, Pydantic |
-| **Task Queue** | Celery, Redis |
-| **Database** | PostgreSQL (Prod), SQLite (Dev), Alembic |
-| **Infra** | Docker, Docker Compose |
-
----
-
-## 8. API Flow
-
-**Upload** → **Background Scan** *(Celery + Redis)* → **Findings Generation** → **Attack Path Correlation** → **Dashboard Visualization**
-
----
-
-## 9. Setup Instructions
-
-### Option A: Dockerized (Production)
-```bash
-# 1. Spin up all 4 containers (React, API, Celery, Redis)
-docker-compose up --build -d
-
-# 2. Navigate to UI
-http://localhost:5173/
-```
-
-### Option B: Local Setup (Development)
-
-**Backend:**
-```bash
+🚀 Live Demo
+Frontend Application: https://cloudsentinel-x-1.onrender.com
+Backend API & Swagger Docs: https://cloudsentinel-x.onrender.com/docs
+✨ Core Features
+🔍 Cloud Configuration Analysis: Identifies leaky storage buckets, exposed IAM privileges, and non-compliant policies.
+🦠 Serverless Malware Detection: Hunts for malicious signatures and suspicious extensions using active signature simulation and file hashing.
+🕵️ Sensitive Data Leak Detection: Discovers unsecured PII (Emails, Phones, Aadhaar IDs, API Keys) natively in cloud storage.
+🛡️ Automated Data Redaction: Secures exposed secrets through zero-leak persistence, guaranteeing sensitive values are irreversibly masked before database commitment.
+🧠 Risk Correlation Engine: Contextualizes independent vulnerabilities, mapping multi-stage Attack Paths and escalating multi-vector threats into critical Intelligence Incidents.
+📊 Real-Time Security Dashboard: Summarizes the threat landscape with interactive telemetry, severity charting, and mitigation tracking.
+🛠️ Tech Stack
+Frontend: React 18 (TypeScript), Vite, Tailwind CSS, Recharts, Lucide React
+Backend: Python 3.10+, FastAPI, SQLAlchemy, Pydantic
+Database: SQLite (Highly portable, Edge-ready architecture)
+Deployment: Render (Frontend Static Site + Python Web Service)
+🏗️ Architecture Flow
+text
+┌─────────────────┐       ┌────────────────────┐       ┌──────────────────┐
+│   React / Vite  │       │  FastAPI Backend   │       │ Threat Scanners  │
+│  (Cloud Admin)  │ ────► │ (REST API / Core)  │ ────► │  - File / Virus  │
+└─────────────────┘       └─────────┬──────────┘       │  - Data Leaks    │
+                                    │                  │  - IAM / Config  │
+                                    ▼                  └──────────────────┘
+                          ┌────────────────────┐
+                          │ Risk Correlation & │
+                          │ Attack Path Engine │
+                          └─────────┬──────────┘
+                                    │
+                          ┌─────────▼──────────┐
+                          │  SQLite Database   │
+                          │(Incidents / Alerts)│
+                          └────────────────────┘
+📁 Project Structure
+text
+CloudSentinel X/
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/         # Backend REST Endpoints (Findings, Scans, Incidents)
+│   │   ├── models/         # SQLAlchemy ORM Models
+│   │   ├── schemas/        # Pydantic Typing definitions
+│   │   └── services/       # Scanners, Parsers & Correlation Engines
+│   ├── datasets/           # System Mock/Sample Files (Malware, DBs, CSVs)
+│   └── requirements.txt    # Python dependencies
+└── frontend/
+    ├── src/
+    │   ├── api/            # API Client + Interceptors
+    │   ├── components/     # UI, Error Boundaries, Routing
+    │   ├── pages/          # Dashboard, Malware, Data Leaks, Incidents
+    │   └── context/        # React Context (State Management)
+    ├── .env.production     # Production routing
+    └── package.json        # Node dependencies & scripts
+⚡ Local Setup Instructions
+1. Backend Setup
+bash
+# Navigate to backend
 cd backend
+# Create Virtual Environment
 python -m venv venv
-source venv/Scripts/activate
+venv\Scripts\activate  # On MacOS/Linux: source venv/bin/activate
+# Install Dependencies
 pip install -r requirements.txt
-alembic upgrade head
+# Run the Server (Localhost:8000)
 uvicorn app.main:app --reload
-```
-*(Ensure local Redis server is executing and run: `celery -A app.worker.tasks worker --loglevel=info`)*
-
-**Frontend:**
-```bash
+2. Frontend Setup
+bash
+# Navigate to frontend in a new terminal
 cd frontend
+# Install Dependencies
 npm install
+# Run Vite Dev Server (Localhost:5173)
 npm run dev
-```
+🔐 Environment Variables
+Backend (backend/.env - Optional)
 
----
+env
+USE_LOCAL_FALLBACK=True # Bypasses complex message queues for SQLite/FastAPI dev
+Frontend (frontend/.env.local)
 
-## 10. Screenshots
+env
+VITE_API_URL=http://localhost:8000/api/v1
+Frontend (frontend/.env.production)
 
-### Dashboard
-![Dashboard](./screenshots/dashboard.png)
+env
+VITE_API_URL=https://cloudsentinel-x.onrender.com/api/v1
+📂 Sample Dataset
+The platform ships with a mock datasets/s3_bucket/ directory to simulate real-world storage threat-hunting:
 
-### Upload & Scan
-![Upload](./screenshots/upload.png)
+malicious.bat: A simulated executable designed to trigger the High-Severity Malware engine.
+customers.csv: A raw plaintext file containing PII (Phone Numbers, Emails) to trigger the Data Leak Detector and dynamic redaction pipeline.
+💡 Challenges Solved
+React Rendering Crashes: Hardened global Hook rendering structures and implemented top-level Error Boundaries to gracefully catch conditional execution failures.
+Infinite Data Duplication: Developed a tail-target Scan-ID filtering algorithm to ensure analytical queries pull only the accurate, latest active project state instead of infinitely hallucinating historical logs.
+Data Localization Contexts: Engineered dynamic os.path directory fallbacks so internal micro-scanners resolve correctly whether the application is running via local terminal, Docker, or Cloud VPS scopes.
+Vite SPA Routing Deficits: Designed the Render configuration using standard Rewrite Rules (/* -> /index.html) to support seamless direct-linking to client-side pages without 404 Not Found server errors.
+🎯 Future Enhancements
+Docker Orchestration: Containerizing both layers via docker-compose to provide instant localized reproduction.
+Celery & Redis: Extending the background worker queues to process asynchronous multi-gigabyte S3 scans concurrently.
+Presidio NLP Integration: Utilizing Microsoft's Presidio data-loss-prevention packages to catch context-aware PII leaks instead of purely Regex pattern-matching.
+👔 Resume Highlights
+Software Engineering: Single-handedly scaled a multi-tier architectural monolith via React and Python/FastAPI using robust REST paradigms.
+Cloud Security Principles: Implemented real-world CSPM threat heuristics encompassing sensitive-data redaction, malware isolation, and IAM risk analysis.
+DevOps Problem-Solving: Diagnosed and remedied complex production deployment issues related to API port configurations, database schema duplication, and React lifecycle crashes.
+👨‍💻 Author
+Designed, developed, and secured by [Your Name Here]
+Cloud Security Architect & Full-Stack Engineer
 
-### Findings Explorer
-![Findings](./screenshots/findings.png)
-
-### IAM Entity Risk Mapping
-![IAM Entities](./screenshots/iam.png)
-
-### Threat Logs Audit
-![Logs](./screenshots/logs.png)
-
-### Correlated Attack Paths
-![Attack Paths](./screenshots/attack-paths.png)
-
-### Historic Scan Analytics
-![Scans](./screenshots/scans.png)
-
----
-
-## 11. Demo Flow
-To demonstrate to a recruiter or engineering manager:
-1. Hit **Upload & Scan** and import a payload.
-2. Emphasize the live polling state and how Celery **Asynchronous Processing** prevents API lock-ups.
-3. Once completed, navigate to **Dashboard**. Highlight the top-down metrics calculation.
-4. Move directly to **Attack Paths**. Show how the **Attack Path Engine** linked an isolated exposed IP with an insecure IAM role to generate a full visual *Exploitation Chain*.
-5. Dig into **IAM Entities** and **Logs** to show raw parsed configuration tracking.
-
----
-
-## 12. Future Improvements
-*   **Integrations:** Direct API hooks into live AWS/GCP infrastructure to remove the need for static JSON mapping (Continuous Monitoring).
-*   **Remediation:** Implement automated Lambda "Auto-Fix" webhooks directly from the frontend dashboard.
-*   **Custom Rulesets:** Allow DevSecOps to define arbitrary YAML graph correlations logic similar to Semgrep rules. 
-
----
-
-## 13. Resume Bullet Points
-
-Want to add this to your resume? Use these verified points mapping to high-value SWE/Security skills:
-
-*   **Designed and built an end-to-end Cloud Security Posture Management (CSPM) application** using React, TypeScript, and FastAPI yielding a full-stack platform capable of automated complex vulnerability detection.
-*   **Engineered an algorithmic Attack Path Engine** utilizing Python heuristics to procedurally generate exploitation graphs natively connecting disparate IAM, Secret, and Asset misconfigurations into contextualized kill chains.
-*   **Architected a distributed scanning pipeline** utilizing Celery and Redis to offload heavy security parsing from the main execution thread, resulting in zero-blocking high-throughput file analysis.
-*   **Constructed a responsive, decoupled frontend architecture** via Tailwind CSS and React Router parsing layered graph-data formats via Axios, highlighting complex threat intel clearly for rapid incident resolution.
-*   **Enforced modern database schema designs** implementing SQLAlchemy and Alembic tracking structured relationships across identities, audit logs, and hardware configurations seamlessly.
-
----
-<div align="center">
-<i>Built to protect next-generation cloud perimeters.</i>
-</div>
