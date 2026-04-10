@@ -1,8 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any
 from datetime import datetime
 
 class LogEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     project_id: int
     scan_id: int
@@ -17,6 +19,3 @@ class LogEventResponse(BaseModel):
     error_code: Optional[str] = None
     raw_event: Optional[Any] = None
     created_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True

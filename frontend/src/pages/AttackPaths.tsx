@@ -27,7 +27,7 @@ export default function AttackPaths() {
       try {
         setLoading(true);
         const data = await getAttackPaths(Number(projectId));
-        setPaths(data);
+        setPaths(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
       } finally {
@@ -126,7 +126,7 @@ export default function AttackPaths() {
            );
         })}
         
-        {paths.length === 0 && (
+        {(Array.isArray(paths) ? paths : []).length === 0 && (
           <div className="bg-white p-12 text-center rounded-xl border border-gray-200 shadow-sm text-gray-500">
             <GitMerge className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-800 mb-2">No Attack Paths Discovered</h3>

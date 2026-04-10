@@ -3,6 +3,9 @@ from typing import List, Dict, Any
 from app.models.iam_entity import IamEntity
 from app.models.finding import Finding
 from sqlalchemy.orm import Session
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Re-use risk scores from scanner
 RISK_SCORES = {
@@ -54,8 +57,8 @@ def analyze_iam_risks(entities: List[IamEntity], scan_id: int, db: Session) -> L
                                 evidence=json.dumps(stmt),
                                 risk_score=RISK_SCORES["CRITICAL"]
                             ))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to parse trust policy for {entity.principal_name}: {e}")
 
         # Rule 1, 2, 3: Inspect inline (and attached) policies
         # (Assuming attached_policies is optionally parsed similarly to inline)
@@ -125,8 +128,8 @@ def analyze_iam_risks(entities: List[IamEntity], scan_id: int, db: Session) -> L
                                 risk_score=RISK_SCORES["CRITICAL"]
                             ))
                             
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to parse inline/attached policy for {entity.principal_name}: {e}")
 
     for f in findings:
         db.add(f)

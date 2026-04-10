@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional, List, Any
 
 class IncidentBase(BaseModel):
@@ -20,8 +20,7 @@ class IncidentCreate(IncidentBase):
     project_id: int
 
 class IncidentResponse(IncidentBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     project_id: int
-
-    class Config:
-        from_attributes = True

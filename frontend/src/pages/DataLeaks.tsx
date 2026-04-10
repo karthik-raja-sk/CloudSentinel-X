@@ -16,7 +16,7 @@ function DataLeaksContent() {
     try {
       setLoading(true);
       const data = await getDataLeakFindings(Number(selectedProjectId));
-      setFindings(data);
+      setFindings(Array.isArray(data) ? data : []);
       setError(null);
     } catch (e: any) {
       console.error(e);
@@ -73,7 +73,7 @@ function DataLeaksContent() {
         <div className="flex justify-center p-12">
           <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
         </div>
-      ) : findings.length === 0 ? (
+      ) : (Array.isArray(findings) ? findings : []).length === 0 ? (
         <div className="bg-white p-12 rounded-xl border border-gray-200 shadow-sm text-center">
             <Database className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-gray-800 mb-2">No Sensitive Data Exposed</h2>
@@ -82,7 +82,7 @@ function DataLeaksContent() {
       ) : (
         <div className="bg-white shadow overflow-hidden sm:rounded-md border border-gray-200">
           <ul className="divide-y divide-gray-200">
-            {findings.map((finding) => (
+            {(Array.isArray(findings) ? findings : []).map((finding) => (
               <li key={finding.id}>
                 <div className="px-6 py-5 flex items-center hover:bg-gray-50 transition-colors">
                   <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between">

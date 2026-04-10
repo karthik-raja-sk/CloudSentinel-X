@@ -1,8 +1,10 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional, Any
 from app.schemas.asset import AssetResponse
 
 class FindingResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     scan_id: int
     asset_id: Optional[int] = None
@@ -28,6 +30,3 @@ class FindingResponse(BaseModel):
         if v is None:
             return ""
         return str(v)
-
-    class Config:
-        from_attributes = True

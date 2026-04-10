@@ -1,18 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.scan import Scan
 from app.schemas.scan import ScanResponse
 from typing import List
-
-from app.services.scanners.file_scanner import scan_files as run_file_scan
-from app.services.scanners.data_leak_detector import scan_data_leaks as run_data_leak_scan
-from app.services.analyzers.risk_correlation_engine import run_correlation
+from app.core.config import settings
+from app.api import deps
+from app.models.project import Project
+from app.worker.tasks import run_file_scan_task, run_data_leak_scan_task, run_correlation_task
 
 router = APIRouter()
 
 @router.get("/project/{project_id}", response_model=List[ScanResponse])
-def get_project_scans(project_id: int, db: Session = Depends(get_db)):
+def get_project_scans(
+    project_id: int,
+    db: Session = Depends(get_db),
+    _project: Project = Depends(deps.get_project_or_403),
+):
     scans = db.query(Scan).filter(Scan.project_id == project_id).order_by(Scan.started_at.desc()).all()
     return scans
 
@@ -24,24 +28,52 @@ def get_scan_status(scan_id: int, db: Session = Depends(get_db)):
     return scan
 
 @router.post("/{project_id}/files", response_model=ScanResponse)
-def trigger_file_scan(project_id: int, db: Session = Depends(get_db)):
-    scan = Scan(project_id=project_id, status="COMPLETED", scan_type="FILE_SCAN")
+def trigger_file_scan(
+    project_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _project: Project = Depends(deps.get_project_or_403),
+    _user=Depends(deps.require_minimum_role({"admin", "analyst", "demo_admin", "demo_analyst"})),
+):
+    scan = Scan(project_id=project_id, status="QUEUED", scan_type="FILE_SCAN")
     db.add(scan)
     db.commit()
     db.refresh(scan)
-    run_file_scan(scan.id, project_id, db)
+
+    if settings.USE_LOCAL_FALLBACK:
+        background_tasks.add_task(run_file_scan_task, scan.id, project_id)
+    else:
+        run_file_scan_task.delay(scan.id, project_id)
     return scan
 
 @router.post("/{project_id}/data-leaks", response_model=ScanResponse)
-def trigger_data_leak_scan(project_id: int, db: Session = Depends(get_db)):
-    scan = Scan(project_id=project_id, status="COMPLETED", scan_type="DATA_LEAK_SCAN")
+def trigger_data_leak_scan(
+    project_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _project: Project = Depends(deps.get_project_or_403),
+    _user=Depends(deps.require_minimum_role({"admin", "analyst", "demo_admin", "demo_analyst"})),
+):
+    scan = Scan(project_id=project_id, status="QUEUED", scan_type="DATA_LEAK_SCAN")
     db.add(scan)
     db.commit()
     db.refresh(scan)
-    run_data_leak_scan(scan.id, project_id, db)
+    if settings.USE_LOCAL_FALLBACK:
+        background_tasks.add_task(run_data_leak_scan_task, scan.id, project_id)
+    else:
+        run_data_leak_scan_task.delay(scan.id, project_id)
     return scan
 
 @router.post("/{project_id}/correlate")
-def trigger_correlation(project_id: int, db: Session = Depends(get_db)):
-    incidents = run_correlation(project_id, db)
-    return {"status": "SUCCESS", "incidents_created": len(incidents)}
+def trigger_correlation(
+    project_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    _project: Project = Depends(deps.get_project_or_403),
+    _user=Depends(deps.require_minimum_role({"admin", "analyst", "demo_admin", "demo_analyst"})),
+):
+    if settings.USE_LOCAL_FALLBACK:
+        background_tasks.add_task(run_correlation_task, project_id)
+    else:
+        run_correlation_task.delay(project_id)
+    return {"status": "QUEUED", "incidents_created": 0}

@@ -15,6 +15,13 @@ from app.schemas.token import Token, TokenPayload
 from pydantic import BaseModel, ValidationError
 from jose import jwt, JWTError
 import uuid
+from collections import defaultdict
+from threading import Lock
+
+FAILED_LOGIN_TRACKER: dict[str, list[datetime]] = defaultdict(list)
+FAILED_LOGIN_LOCK = Lock()
+MAX_FAILED_LOGINS = 5
+FAILED_LOGIN_WINDOW_MINUTES = 10
 
 router = APIRouter()
 
@@ -59,9 +66,24 @@ def login_access_token(
     form_data: OAuth2PasswordRequestForm = Depends()
 ):
     ip = request.client.host if request.client else None
+    identity_key = f"{form_data.username}:{ip}"
+    now = datetime.utcnow()
+    with FAILED_LOGIN_LOCK:
+        recent = [
+            ts for ts in FAILED_LOGIN_TRACKER.get(identity_key, [])
+            if ts >= now - timedelta(minutes=FAILED_LOGIN_WINDOW_MINUTES)
+        ]
+        FAILED_LOGIN_TRACKER[identity_key] = recent
+        if len(recent) >= MAX_FAILED_LOGINS:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many failed login attempts. Try again later.",
+            )
     user = db.query(User).filter(User.email == form_data.username).first()
     
     if not user or not security.verify_password(form_data.password, user.hashed_password):
+        with FAILED_LOGIN_LOCK:
+            FAILED_LOGIN_TRACKER[identity_key].append(now)
         AuditService.log(db, "login_failed", "failure", email=form_data.username, ip_address=ip)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
     
@@ -71,6 +93,8 @@ def login_access_token(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email not verified")
 
     generate_refresh_token_and_set_cookie(response, user, db)
+    with FAILED_LOGIN_LOCK:
+        FAILED_LOGIN_TRACKER.pop(identity_key, None)
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     AuditService.log(db, "login_success", "success", user_id=user.id, email=user.email, role=user.role, ip_address=ip)
@@ -134,7 +158,7 @@ def demo_login(
     request: Request, req: DemoLoginRequest, response: Response, db: Session = Depends(deps.get_db)
 ):
     ip = request.client.host if request.client else None
-    if req.role not in ["Admin", "Analyst"]:
+    if req.role not in ["Admin", "Analyst", "Viewer"]:
         raise HTTPException(status_code=400, detail="Invalid demo role")
     
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

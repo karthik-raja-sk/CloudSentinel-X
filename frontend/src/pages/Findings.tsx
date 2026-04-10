@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useProjectContext } from '../context/ProjectContext';
-import { useAuth } from '../context/AuthContext';
 import { getFindings, updateFindingStatus } from '../api/client';
 import { Loader2, Search, Filter, Shield, AlertTriangle, AlertCircle, Info, ArrowUpDown, Download } from 'lucide-react';
 
@@ -12,8 +11,7 @@ const SEVERITY_INFO: Record<string, { color: string, icon: any }> = {
 };
 
 export default function Findings() {
-  const { selectedProjectId: projectId } = useProjectContext();
-  const { role } = useAuth();
+  const { selectedProjectId: projectId, selectedProjectRole } = useProjectContext();
   const [loading, setLoading] = useState(true);
   const [findings, setFindings] = useState<any[]>([]);
   
@@ -24,7 +22,7 @@ export default function Findings() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [previewFinding, setPreviewFinding] = useState<any>(null);
-  const isAdminRole = String(role || '').toLowerCase() === 'admin' || String(role || '').toLowerCase() === 'demo_admin';
+  const isAdminRole = String(selectedProjectRole || '').toLowerCase() === 'admin';
 
   const fetchFindings = async () => {
     try {

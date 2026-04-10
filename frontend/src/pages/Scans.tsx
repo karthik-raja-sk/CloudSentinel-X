@@ -66,7 +66,7 @@ export default function Scans() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {s.created_at ? new Date(s.created_at).toLocaleString() : 'N/A'}
+                    {s.started_at ? new Date(s.started_at).toLocaleString() : 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{String(s.scan_type || 'CONFIG_UPLOAD')}</td>
                 </tr>

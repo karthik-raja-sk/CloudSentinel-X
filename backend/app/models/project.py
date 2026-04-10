@@ -7,6 +7,7 @@ class Project(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)
     owner_id = Column(Integer, ForeignKey("user.id"))
+    organization_id = Column(Integer, ForeignKey("organization.id"), nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     owner = relationship("User")

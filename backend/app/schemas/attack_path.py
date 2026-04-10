@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, Any, List
 from datetime import datetime
 
@@ -11,12 +11,10 @@ class PathEdge(BaseModel):
     from_node: str
     to_node: str
     relation: str
-    
-    class Config:
-        populate_by_name = True
-        alias_generator = lambda string: "from" if string == "from_node" else ("to" if string == "to_node" else string)
 
 class AttackPathResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     project_id: int
     scan_id: int
@@ -27,6 +25,3 @@ class AttackPathResponse(BaseModel):
     path_nodes: Optional[Any] = None
     path_edges: Optional[Any] = None
     created_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True

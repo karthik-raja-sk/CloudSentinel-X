@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.upload import Upload
@@ -8,6 +8,7 @@ from app.worker.tasks import run_scan_task
 import os
 import shutil
 from datetime import datetime
+from pathlib import Path
 
 router = APIRouter()
 
@@ -15,12 +16,26 @@ UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 from app.core.config import settings
+from app.api import deps
+from app.models.project import Project
 
 @router.post("/{project_id}", response_model=UploadResponse)
-def upload_config(project_id: int, background_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(get_db)):
+def upload_config(
+    project_id: int,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _project: Project = Depends(deps.get_project_or_403),
+    _user=Depends(deps.require_minimum_role({"admin", "analyst", "demo_admin", "demo_analyst"})),
+):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    safe_filename = Path(file.filename).name
+    if safe_filename in {"", ".", ".."}:
+        raise HTTPException(status_code=400, detail="Invalid filename")
     # 1. Save file locally
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    file_path = os.path.join(UPLOAD_DIR, f"{project_id}_{timestamp}_{file.filename}")
+    file_path = os.path.join(UPLOAD_DIR, f"{project_id}_{timestamp}_{safe_filename}")
     
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
@@ -28,7 +43,7 @@ def upload_config(project_id: int, background_tasks: BackgroundTasks, file: Uplo
     # 2. Create Upload record
     upload = Upload(
         project_id=project_id,
-        filename=file.filename,
+        filename=safe_filename,
         s3_key=file_path # Using s3_key to store local path for V1
     )
     db.add(upload)

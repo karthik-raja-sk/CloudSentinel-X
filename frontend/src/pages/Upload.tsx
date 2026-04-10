@@ -1,18 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjectContext } from '../context/ProjectContext';
-import { useAuth } from '../context/AuthContext';
 import { uploadFile, getScanStatus } from '../api/client';
 import { UploadCloud, CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 
 export default function Upload() {
-  const { selectedProjectId: projectId } = useProjectContext();
-  const { role } = useAuth();
+  const { selectedProjectId: projectId, selectedProjectRole } = useProjectContext();
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [scanState, setScanState] = useState<{ scanId?: number; status?: string; error?: string }>({});
   const [validationError, setValidationError] = useState<string | null>(null);
+  const normalizedProjectRole = String(selectedProjectRole || '').toLowerCase();
+  const canUpload = ['admin', 'analyst'].includes(normalizedProjectRole);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValidationError(null);
@@ -36,7 +36,7 @@ export default function Upload() {
   };
 
   const handleUpload = async () => {
-    if (!file || !projectId || role !== 'Admin') return;
+    if (!file || !projectId || !canUpload) return;
     setIsUploading(true);
     setScanState({});
     
@@ -103,9 +103,9 @@ export default function Upload() {
               </div>
             )}
 
-            {role === 'Analyst' ? (
+            {!canUpload ? (
               <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 text-left mb-6 font-bold">
-                 You are logged in as an Analyst. Upload permissions are restricted to Admins.
+                 Your current role does not allow uploads. Ask an analyst or admin to run scans.
               </div>
             ) : (
                 <button 

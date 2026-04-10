@@ -13,6 +13,9 @@ from app.services.parsers.log_parser import parse_log_events
 from app.services.analyzers.log_threat_analyzer import analyze_log_threats
 from app.services.analyzers.attack_path_engine import generate_attack_paths
 from app.services.scanners.pii_detector import scan_file_for_pii
+from app.services.scanners.file_scanner import scan_files as run_file_scan
+from app.services.scanners.data_leak_detector import scan_data_leaks as run_data_leak_scan
+from app.services.analyzers.risk_correlation_engine import run_correlation
 from datetime import datetime
 import traceback
 
@@ -73,5 +76,66 @@ def run_scan_task(scan_id: int):
             scan.completed_at = datetime.utcnow()
             db.commit()
         print(f"Task failed: {traceback.format_exc()}")
+    finally:
+        db.close()
+
+
+@celery_app.task(name="run_file_scan")
+def run_file_scan_task(scan_id: int, project_id: int):
+    db = SessionLocal()
+    try:
+        scan = db.query(Scan).filter(Scan.id == scan_id, Scan.project_id == project_id).first()
+        if not scan:
+            return
+        scan.status = "RUNNING"
+        db.commit()
+        run_file_scan(scan_id, project_id, db)
+        scan.status = "COMPLETED"
+        scan.error_message = None
+        scan.completed_at = datetime.utcnow()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if scan:
+            scan.status = "FAILED"
+            scan.error_message = str(exc)[:500]
+            scan.completed_at = datetime.utcnow()
+            db.commit()
+    finally:
+        db.close()
+
+
+@celery_app.task(name="run_data_leak_scan")
+def run_data_leak_scan_task(scan_id: int, project_id: int):
+    db = SessionLocal()
+    try:
+        scan = db.query(Scan).filter(Scan.id == scan_id, Scan.project_id == project_id).first()
+        if not scan:
+            return
+        scan.status = "RUNNING"
+        db.commit()
+        run_data_leak_scan(scan_id, project_id, db)
+        scan.status = "COMPLETED"
+        scan.error_message = None
+        scan.completed_at = datetime.utcnow()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        scan = db.query(Scan).filter(Scan.id == scan_id).first()
+        if scan:
+            scan.status = "FAILED"
+            scan.error_message = str(exc)[:500]
+            scan.completed_at = datetime.utcnow()
+            db.commit()
+    finally:
+        db.close()
+
+
+@celery_app.task(name="run_correlation")
+def run_correlation_task(project_id: int):
+    db = SessionLocal()
+    try:
+        run_correlation(project_id, db)
     finally:
         db.close()

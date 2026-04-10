@@ -7,6 +7,9 @@ import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function DashboardLayout() {
   const { 
+    organizations,
+    selectedOrganizationId,
+    setSelectedOrganizationId,
     projects, 
     selectedProjectId, 
     setSelectedProjectId, 
@@ -14,7 +17,7 @@ export default function DashboardLayout() {
     error,
     handleCreateProject
   } = useProjectContext();
-  const { role, logout } = useAuth();
+  const { role, user, logout } = useAuth();
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -106,7 +109,7 @@ export default function DashboardLayout() {
         <h1 className="text-2xl font-bold text-blue-500 mb-8 px-2 tracking-tight">CloudSentinel X</h1>
         <nav className="space-y-2 flex flex-col h-[calc(100vh-100px)]">
            <div className="flex-1">
-             {['dashboard', 'upload', 'findings', 'malware', 'data-leaks', 'incidents', 'iam', 'logs', 'attack-paths'].map(route => (
+             {['dashboard', 'upload', 'findings', 'malware', 'data-leaks', 'incidents', 'iam', 'logs', 'attack-paths', 'audit-logs', 'project-members', 'organization-members'].map(route => (
                 <Link 
                    key={route}
                    to={`/${route}`} 
@@ -131,6 +134,16 @@ export default function DashboardLayout() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="h-16 bg-white border-b flex items-center justify-between px-6 shadow-sm z-10">
           <div className="flex items-center space-x-4">
+            <span className="text-gray-500 text-sm font-bold uppercase tracking-wider hidden md:block">Organization</span>
+            <select
+              value={selectedOrganizationId || ''}
+              onChange={e => setSelectedOrganizationId(Number(e.target.value))}
+              className="block w-56 pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md border font-bold text-gray-800 shadow-sm"
+            >
+              {(organizations || []).map(o => (
+                <option key={o.id} value={o.id}>{o.name}</option>
+              ))}
+            </select>
             <span className="text-gray-500 text-sm font-bold uppercase tracking-wider hidden md:block">Workspace</span>
             <select 
               value={activeProject?.id || ''} 
@@ -143,11 +156,56 @@ export default function DashboardLayout() {
             </select>
           </div>
           
-          <div className="flex items-center space-x-4">
-            <span className={`text-xs font-bold px-2 py-1 rounded border uppercase tracking-wider ${role === 'Admin' ? 'bg-indigo-100 text-indigo-800 border-indigo-200' : 'bg-gray-100 text-gray-800 border-gray-200'}`}>
-              Role: {role}
-            </span>
-            <button onClick={handleLogout} className="text-sm bg-gray-100 hover:bg-gray-200 transition text-gray-700 px-4 py-1.5 rounded-md shadow-sm font-bold border border-gray-200">Logout</button>
+          <div className="flex items-center space-x-4 relative">
+             {user && (
+               <div className="relative group">
+                 <button className="flex items-center space-x-3 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md p-1">
+                   <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center border border-blue-200">
+                     <span className="text-blue-700 font-bold text-sm uppercase">
+                       {user.full_name ? user.full_name[0] : user.email[0]}
+                     </span>
+                   </div>
+                   <div className="hidden lg:flex flex-col items-start pr-2">
+                     <span className="text-sm font-bold text-gray-800 leading-tight">
+                       {user.full_name || user.email.split('@')[0]}
+                     </span>
+                     <span className="text-xs text-gray-500 capitalize">{role?.replace('_', ' ')}</span>
+                   </div>
+                 </button>
+
+                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div className="p-4 border-b border-gray-100">
+                       <p className="font-bold text-gray-900 truncate">{user.full_name || 'No Name Provided'}</p>
+                       <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                    </div>
+                    <div className="p-4 space-y-3">
+                       <div className="flex justify-between items-center">
+                         <span className="text-xs text-gray-500 font-medium">Status</span>
+                         <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${user.is_verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {user.is_verified ? 'Verified' : 'Pending'}
+                         </span>
+                       </div>
+                       <div className="flex justify-between items-center">
+                         <span className="text-xs text-gray-500 font-medium">Active Role</span>
+                         <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded capitalize font-medium border border-gray-200">
+                            {role?.replace('_', ' ')}
+                         </span>
+                       </div>
+                       {user.last_login && (
+                         <div className="flex flex-col mt-2 pt-2 border-t border-gray-50">
+                           <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Last Login</span>
+                           <span className="text-xs text-gray-600">{new Date(user.last_login).toLocaleString()}</span>
+                         </div>
+                       )}
+                    </div>
+                    <div className="p-2 border-t border-gray-100 bg-gray-50 rounded-b-lg">
+                       <button onClick={handleLogout} className="w-full text-center text-sm bg-white hover:bg-gray-100 transition text-red-600 px-4 py-2 rounded-md shadow-sm font-bold border border-gray-200">
+                         Sign out safely
+                       </button>
+                    </div>
+                 </div>
+               </div>
+             )}
           </div>
         </header>
         

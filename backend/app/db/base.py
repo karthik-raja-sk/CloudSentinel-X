@@ -9,3 +9,8 @@ from app.models.finding import Finding
 from app.models.log_event import LogEvent
 from app.models.attack_path import AttackPath
 from app.models.incident import Incident
+from app.models.audit_log import AuditLog
+from app.models.project_membership import ProjectMembership
+from app.models.organization import Organization
+from app.models.organization_membership import OrganizationMembership
+from app.models.organization_invite import OrganizationInvite

@@ -4,6 +4,35 @@ const api = axios.create({
   baseURL: (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1',
   withCredentials: true,
 });
+const API_V1 = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+const refreshAccessToken = async (): Promise<string | null> => {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      try {
+        const res = await fetch(`${API_V1}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const token = typeof data?.access_token === 'string' ? data.access_token : null;
+        if (token) {
+          localStorage.setItem('cloudSentinelToken', token);
+        }
+        return token;
+      } catch {
+        return null;
+      } finally {
+        refreshPromise = null;
+      }
+    })();
+  }
+  return refreshPromise;
+};
 
 // Request interceptor to attach JWT token if it exists (useful as a hardening measure)
 api.interceptors.request.use((config) => {
@@ -18,7 +47,26 @@ api.interceptors.request.use((config) => {
 // Response interceptor to handle errors globally and pass actionable messages
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = (error?.config || {}) as any;
+    if (error?.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      if (!isRefreshing) {
+        isRefreshing = true;
+      }
+      const newToken = await refreshAccessToken();
+      isRefreshing = false;
+      if (newToken) {
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      }
+      localStorage.removeItem('cloudSentinelToken');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login?expired=true';
+      }
+    }
+
     if ((import.meta as any).env?.DEV) {
       console.error(`API Request Failed for ${error.config?.url}:`, error);
     }
@@ -44,8 +92,84 @@ export const getProjects = async () => {
   return response.data;
 };
 
+export type Organization = {
+  id: number;
+  name: string;
+  current_role?: 'org_admin' | 'org_member' | string;
+  created_at: string;
+};
+
+export const getOrganizations = async (): Promise<Organization[]> => {
+  const response = await api.get('/organizations/');
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const createOrganization = async (name: string): Promise<Organization> => {
+  const response = await api.post('/organizations/', { name });
+  return response.data;
+};
+
 export const createProject = async (name: string) => {
   const response = await api.post('/projects/', { name });
+  return response.data;
+};
+
+export const createProjectInOrg = async (name: string, organizationId: number) => {
+  const response = await api.post('/projects/', { name, organization_id: organizationId });
+  return response.data;
+};
+
+export type ProjectMember = {
+  id: number;
+  user_id: number;
+  project_id: number;
+  role: 'admin' | 'analyst' | 'viewer' | string;
+  created_at: string;
+  email?: string | null;
+  full_name?: string | null;
+};
+
+export const listProjectMembers = async (projectId: number): Promise<ProjectMember[]> => {
+  const response = await api.get(`/projects/${projectId}/members`);
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const inviteProjectMember = async (projectId: number, email: string, role: string): Promise<ProjectMember> => {
+  const response = await api.post(`/projects/${projectId}/members`, { email, role });
+  return response.data;
+};
+
+export const updateProjectMemberRole = async (projectId: number, userId: number, role: string): Promise<ProjectMember> => {
+  const response = await api.patch(`/projects/${projectId}/members/${userId}`, { role });
+  return response.data;
+};
+
+export const removeProjectMember = async (projectId: number, userId: number): Promise<{ status: string }> => {
+  const response = await api.delete(`/projects/${projectId}/members/${userId}`);
+  return response.data;
+};
+
+export type OrganizationMember = {
+  id: number;
+  organization_id: number;
+  user_id: number;
+  role: 'org_admin' | 'org_member' | string;
+  created_at: string;
+  email?: string | null;
+  full_name?: string | null;
+};
+
+export const listOrganizationMembers = async (organizationId: number): Promise<OrganizationMember[]> => {
+  const response = await api.get(`/organizations/${organizationId}/members`);
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const inviteOrganizationMember = async (
+  organizationId: number,
+  email: string,
+  role: 'org_admin' | 'org_member'
+): Promise<{ status: string; token: string }> => {
+  const response = await api.post(`/organizations/${organizationId}/invites`, { email, role });
   return response.data;
 };
 

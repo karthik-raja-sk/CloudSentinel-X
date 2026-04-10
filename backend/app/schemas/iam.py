@@ -1,8 +1,10 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import Optional, Any
 from datetime import datetime
 
 class IamEntityResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     project_id: int
     scan_id: int
@@ -23,6 +25,3 @@ class IamEntityResponse(BaseModel):
         if v is None:
             return ""
         return str(v)
-
-    class Config:
-        from_attributes = True
