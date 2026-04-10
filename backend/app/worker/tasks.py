@@ -24,9 +24,15 @@ def run_scan_task(scan_id: int):
     db = SessionLocal()
     try:
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
-        if not scan: return
+        if not scan: 
+            return
         
+        # Guard: Only start if in QUEUED state
+        if scan.status != "QUEUED":
+            return
+            
         scan.status = "RUNNING"
+        scan.started_at = datetime.utcnow()
         db.commit()
         
         upload = db.query(Upload).filter(Upload.project_id == scan.project_id).order_by(Upload.id.desc()).first()
@@ -58,21 +64,22 @@ def run_scan_task(scan_id: int):
             analyze_log_threats(log_events, scan.id, db)
             
         # 6. Generate Attack Paths
-        # Fetch all findings for this scan to correlate 
         findings = db.query(Finding).filter(Finding.scan_id == scan.id).all()
         generate_attack_paths(assets, iam_entities, log_events, findings, scan.id, scan.project_id, db)
         
         # Complete
         scan.status = "COMPLETED"
+        scan.error_message = None
         scan.completed_at = datetime.utcnow()
         db.commit()
         
     except Exception as e:
         db.rollback()
+        # Fresh lookup after rollback
         scan = db.query(Scan).filter(Scan.id == scan_id).first()
         if scan:
             scan.status = "FAILED"
-            scan.error_message = str(e)
+            scan.error_message = str(e)[:500]
             scan.completed_at = datetime.utcnow()
             db.commit()
         print(f"Task failed: {traceback.format_exc()}")
@@ -85,11 +92,18 @@ def run_file_scan_task(scan_id: int, project_id: int):
     db = SessionLocal()
     try:
         scan = db.query(Scan).filter(Scan.id == scan_id, Scan.project_id == project_id).first()
-        if not scan:
+        if not scan or scan.status != "QUEUED":
             return
+            
         scan.status = "RUNNING"
+        scan.started_at = datetime.utcnow()
         db.commit()
-        run_file_scan(scan_id, project_id, db)
+        
+        upload = db.query(Upload).filter(Upload.project_id == project_id).order_by(Upload.id.desc()).first()
+        target_dir = upload.s3_key if (upload and upload.s3_key) else None
+        
+        run_file_scan(scan_id, project_id, db, target_dir=target_dir)
+        
         scan.status = "COMPLETED"
         scan.error_message = None
         scan.completed_at = datetime.utcnow()
@@ -111,11 +125,18 @@ def run_data_leak_scan_task(scan_id: int, project_id: int):
     db = SessionLocal()
     try:
         scan = db.query(Scan).filter(Scan.id == scan_id, Scan.project_id == project_id).first()
-        if not scan:
+        if not scan or scan.status != "QUEUED":
             return
+            
         scan.status = "RUNNING"
+        scan.started_at = datetime.utcnow()
         db.commit()
-        run_data_leak_scan(scan_id, project_id, db)
+        
+        upload = db.query(Upload).filter(Upload.project_id == project_id).order_by(Upload.id.desc()).first()
+        target_dir = upload.s3_key if (upload and upload.s3_key) else None
+        
+        run_data_leak_scan(scan_id, project_id, db, target_dir=target_dir)
+        
         scan.status = "COMPLETED"
         scan.error_message = None
         scan.completed_at = datetime.utcnow()
@@ -137,5 +158,9 @@ def run_correlation_task(project_id: int):
     db = SessionLocal()
     try:
         run_correlation(project_id, db)
+    except Exception as e:
+        db.rollback()
+        print(f"Correlation failed: {str(e)}")
     finally:
         db.close()
+

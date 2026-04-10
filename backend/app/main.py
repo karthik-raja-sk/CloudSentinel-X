@@ -68,8 +68,18 @@ app.add_middleware(
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request, exc):
+    # Log the full traceback for the server logs
     logger.exception("unhandled_exception")
     return JSONResponse(
         status_code=500,

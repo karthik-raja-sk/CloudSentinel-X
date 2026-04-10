@@ -22,7 +22,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const API_ROOT = ((import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1').replace(/\/api\/v1\/?$/, '');
+const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -32,34 +32,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Global authenticated fetch handler
   const apiFetch = useCallback(async (url: string, options: RequestInit = {}) => {
-    let token = localStorage.getItem('cloudSentinelToken');
+    const token = localStorage.getItem('cloudSentinelToken');
     
+    // Safety guard: if we are calling a protected endpoint without a token, 
+    // we should return a 401 early to avoid invalid requests, UNLESS it's the me call during init.
+    if (!token && !url.includes('/auth/login') && !url.includes('/auth/refresh') && url !== '/auth/me') {
+       return new Response(JSON.stringify({ detail: "Not authenticated" }), { status: 401 });
+    }
+
     options.headers = {
       ...options.headers,
       ...(token && { Authorization: `Bearer ${token}` })
     };
 
-    // Need credentials to pass httponly cookies!
-    options.credentials = 'include';
+    options.credentials = 'include'; // Essential for HttpOnly cookies
 
-    let res = await fetch(`${API_ROOT}${url}`, options);
+    // Ensure URL doesn't have double slashes if url starts with /
+    const targetUrl = url.startsWith('http') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+    let res = await fetch(targetUrl, options);
 
-    // If Access Token is expired, try to catch the 401 and Refresh!
-    if (res.status === 401 && token) {
+    // Automatic Refresh Logic
+    if (res.status === 401 && token && !url.includes('/auth/refresh')) {
       try {
-        const refreshRes = await fetch(`${API_ROOT}/api/v1/auth/refresh`, {
+        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
           method: 'POST',
-          credentials: 'include' // passes HttpOnly refresh cookie natively
+          credentials: 'include'
         });
         
         if (refreshRes.ok) {
            const refreshData = await refreshRes.json();
-           localStorage.setItem('cloudSentinelToken', refreshData.access_token);
-           options.headers = { ...options.headers, Authorization: `Bearer ${refreshData.access_token}` };
-           // Retry original
-           res = await fetch(`${API_ROOT}${url}`, options);
+           const newToken = refreshData.access_token;
+           localStorage.setItem('cloudSentinelToken', newToken);
+           
+           // Retry with new token
+           const retryOptions = {
+             ...options,
+             headers: { ...options.headers, Authorization: `Bearer ${newToken}` }
+           };
+           res = await fetch(targetUrl, retryOptions);
         } else {
-           // Refresh token failed/expired
            logout(true);
         }
       } catch (err) {
@@ -74,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const token = localStorage.getItem('cloudSentinelToken');
       if (token) {
         try {
-          const res = await apiFetch('/api/v1/auth/me');
+          const res = await apiFetch('/auth/me');
           if (res.ok) {
             const userData = await res.json();
             setUser(userData);
@@ -102,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async (expired: boolean = false) => {
     try {
-       await apiFetch('/api/v1/auth/logout', { method: 'POST' });
+       await apiFetch('/auth/logout', { method: 'POST' });
     } catch {}
     localStorage.removeItem('cloudSentinelToken');
     setUser(null);

@@ -11,6 +11,8 @@ from app.models.user import User
 
 router = APIRouter()
 
+from sqlalchemy import func
+
 @router.get("/project/{project_id}", response_model=List[FindingResponse])
 def get_project_findings(
     project_id: int,
@@ -18,22 +20,19 @@ def get_project_findings(
     db: Session = Depends(get_db),
     _project: Project = Depends(deps.get_project_or_403),
 ):
-    scan_types = ["CONFIG_UPLOAD", "FILE_SCAN", "DATA_LEAK_SCAN"]
-    latest_scan_ids = []
-    for stype in scan_types:
-        latest = db.query(Scan.id).filter(Scan.project_id == project_id, Scan.scan_type == stype).order_by(Scan.id.desc()).first()
-        if latest:
-            latest_scan_ids.append(latest.id)
-            
-    if not latest_scan_ids:
-        return []
-        
-    query = db.query(Finding).filter(Finding.scan_id.in_(latest_scan_ids))
+    # Active Vulnerability Model: Fetch all findings currently in OPEN or IN_PROGRESS status across all project scans
+    query = (
+        db.query(Finding)
+        .join(Scan, Scan.id == Finding.scan_id)
+        .filter(Scan.project_id == project_id)
+        .filter(Finding.remediation_status.in_(["OPEN", "IN_PROGRESS"]))
+    )
     if type:
         query = query.filter(Finding.finding_type == type)
         
     findings = query.order_by(Finding.risk_score.desc()).all()
     return findings
+
 
 from pydantic import BaseModel
 

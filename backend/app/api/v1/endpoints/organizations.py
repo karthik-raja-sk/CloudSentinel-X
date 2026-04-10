@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.api import deps
 from app.db.session import get_db
 from app.models.organization import Organization
@@ -28,12 +29,12 @@ def list_organizations(
 ):
     if current_user.is_superuser or (current_user.role or "").lower().startswith("demo_"):
         orgs = db.query(Organization).order_by(Organization.id.asc()).all()
-        return [OrganizationResponse.model_validate({**o.__dict__, "current_role": "org_admin"}) for o in orgs]
+        return [OrganizationResponse.model_validate(o).model_copy(update={"current_role": "org_admin"}) for o in orgs]
     memberships = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == current_user.id).all()
     org_ids = [m.organization_id for m in memberships]
     role_map = {m.organization_id: m.role for m in memberships}
     orgs = db.query(Organization).filter(Organization.id.in_(org_ids)).order_by(Organization.id.asc()).all()
-    return [OrganizationResponse.model_validate({**o.__dict__, "current_role": role_map.get(o.id)}) for o in orgs]
+    return [OrganizationResponse.model_validate(o).model_copy(update={"current_role": role_map.get(o.id)}) for o in orgs]
 
 
 @router.post("/", response_model=OrganizationResponse)
@@ -42,17 +43,26 @@ def create_organization(
     db: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_active_user),
 ):
-    org = Organization(name=payload.name)
-    db.add(org)
-    db.commit()
-    db.refresh(org)
+    try:
+        org = Organization(name=payload.name)
+        db.add(org)
+        db.commit()
+        db.refresh(org)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Organization with name '{payload.name}' already exists."
+        )
 
     membership = OrganizationMembership(organization_id=org.id, user_id=current_user.id, role="org_admin")
     db.add(membership)
     db.commit()
 
     AuditService.log(db, "organization_created", "success", user_id=current_user.id, email=current_user.email)
-    return OrganizationResponse.model_validate({**org.__dict__, "current_role": "org_admin"})
+    
+    # Return using from_attributes=True safe pattern
+    return OrganizationResponse.model_validate(org).model_copy(update={"current_role": "org_admin"})
 
 
 @router.get("/{organization_id}/members", response_model=list[OrganizationMembershipResponse])

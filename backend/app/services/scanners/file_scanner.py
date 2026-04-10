@@ -18,7 +18,9 @@ def get_file_hash(filepath: str) -> str:
 
 def scan_files(scan_id: int, project_id: int, db: Session, target_dir: str = None):
     if target_dir is None:
-        target_dir = "../datasets/s3_bucket" if os.path.exists("../datasets/s3_bucket") else "datasets/s3_bucket"
+        # No more fallback to hardcoded datasets/s3_bucket if not provided
+        # This ensures we only scan what is actually requested/uploaded
+        return findings
         
     findings = []
     

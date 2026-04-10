@@ -34,7 +34,8 @@ def mask_value(match_type: str, value: str) -> str:
 
 def scan_data_leaks(scan_id: int, project_id: int, db: Session, target_dir: str = None):
     if target_dir is None:
-        target_dir = "../datasets/s3_bucket" if os.path.exists("../datasets/s3_bucket") else "datasets/s3_bucket"
+        # Avoid scanning hardcoded folders by default; scan only what's passed
+        return findings
         
     findings = []
     

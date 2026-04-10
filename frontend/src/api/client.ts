@@ -1,10 +1,11 @@
 import axios from 'axios';
 
+const API_V1 = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
+
 const api = axios.create({
-  baseURL: (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1',
+  baseURL: API_V1,
   withCredentials: true,
 });
-const API_V1 = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
@@ -17,14 +18,18 @@ const refreshAccessToken = async (): Promise<string | null> => {
           method: 'POST',
           credentials: 'include',
         });
-        if (!res.ok) return null;
+        if (!res.ok) {
+          localStorage.removeItem('cloudSentinelToken');
+          return null;
+        }
         const data = await res.json();
         const token = typeof data?.access_token === 'string' ? data.access_token : null;
         if (token) {
           localStorage.setItem('cloudSentinelToken', token);
         }
         return token;
-      } catch {
+      } catch (err) {
+        console.error("Refresh token error", err);
         return null;
       } finally {
         refreshPromise = null;
@@ -34,7 +39,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
   return refreshPromise;
 };
 
-// Request interceptor to attach JWT token if it exists (useful as a hardening measure)
+// Request interceptor to attach JWT token if it exists
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('cloudSentinelToken');
   if (token) {
@@ -44,25 +49,24 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor to handle errors globally and pass actionable messages
+// Response interceptor to handle errors globally
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = (error?.config || {}) as any;
-    if (error?.response?.status === 401 && !originalRequest._retry) {
+    const originalRequest = error?.config;
+    // Prevent infinite loops if the refresh call itself is returning 401
+    if (error?.response?.status === 401 && originalRequest && !originalRequest._retry && !originalRequest.url?.includes('/auth/refresh')) {
       originalRequest._retry = true;
-      if (!isRefreshing) {
-        isRefreshing = true;
-      }
+      
       const newToken = await refreshAccessToken();
-      isRefreshing = false;
       if (newToken) {
         originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return api(originalRequest);
       }
+      
       localStorage.removeItem('cloudSentinelToken');
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
         window.location.href = '/login?expired=true';
       }
     }
@@ -72,11 +76,20 @@ api.interceptors.response.use(
     }
     
     if (error.response) {
-      // The request was made and the server responded with a status code
-      error.message = `[${error.response.status}] ${error.response.data?.detail || error.response.statusText} (${error.config?.url})`;
+      const status = error.response.status;
+      const detail = error.response.data?.detail || error.response.statusText;
+      
+      if (status >= 400 && status < 500) {
+        error.message = `API Error [${status}]: ${detail}`;
+      } else if (status >= 500) {
+        error.message = `Server Error [${status}]: The backend encountered an issue. (${detail})`;
+      } else {
+        error.message = `Unexpected Response [${status}]: ${detail}`;
+      }
     } else if (error.request) {
-      // The request was made but no response was received
-      error.message = `Backend server is unreachable. Please check if the API is running on localhost:8000 (Failed calling ${error.config?.url})`;
+      error.message = `Network Error: Backend server is unreachable at http://localhost:8000. Ensure the FastAPI server is running.`;
+    } else {
+      error.message = `Request Error: ${error.message}`;
     }
     return Promise.reject(error);
   }
@@ -109,14 +122,14 @@ export const createOrganization = async (name: string): Promise<Organization> =>
   return response.data;
 };
 
-export const createProject = async (name: string) => {
-  const response = await api.post('/projects/', { name });
+export const createProject = async (name: string, organizationId?: number) => {
+  const payload = organizationId ? { name, organization_id: organizationId } : { name };
+  const response = await api.post('/projects/', payload);
   return response.data;
 };
 
 export const createProjectInOrg = async (name: string, organizationId: number) => {
-  const response = await api.post('/projects/', { name, organization_id: organizationId });
-  return response.data;
+  return createProject(name, organizationId);
 };
 
 export type ProjectMember = {

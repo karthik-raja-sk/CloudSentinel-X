@@ -5,7 +5,7 @@ from datetime import datetime
 
 class Scan(Base):
     id = Column(Integer, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("project.id"))
+    project_id = Column(Integer, ForeignKey("project.id", ondelete="CASCADE"))
     status = Column(String, default="QUEUED")
     scan_type = Column(String)
     started_at = Column(DateTime, default=datetime.utcnow)

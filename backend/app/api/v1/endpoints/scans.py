@@ -7,7 +7,9 @@ from typing import List
 from app.core.config import settings
 from app.api import deps
 from app.models.project import Project
+from app.models.user import User
 from app.worker.tasks import run_file_scan_task, run_data_leak_scan_task, run_correlation_task
+
 
 router = APIRouter()
 
@@ -21,11 +23,20 @@ def get_project_scans(
     return scans
 
 @router.get("/{scan_id}", response_model=ScanResponse)
-def get_scan_status(scan_id: int, db: Session = Depends(get_db)):
+def get_scan_status(
+    scan_id: int, 
+    db: Session = Depends(get_db),
+    current_user: User = Depends(deps.get_current_active_user)
+):
     scan = db.query(Scan).filter(Scan.id == scan_id).first()
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
+        
+    # BOLA Check: Ensure user has access to the project associated with this scan
+    deps.get_project_or_403(scan.project_id, db, current_user)
+    
     return scan
+
 
 @router.post("/{project_id}/files", response_model=ScanResponse)
 def trigger_file_scan(

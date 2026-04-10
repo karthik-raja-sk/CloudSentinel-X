@@ -16,51 +16,65 @@ def run_correlation(project_id: int, db: Session):
     else:
         findings = db.query(Finding).filter(Finding.scan_id.in_(latest_scan_ids)).all()
     
-    has_malware = any(f.finding_type == 'malware' for f in findings)
-    has_data_leak = any(f.finding_type == 'data_leak' for f in findings)
-    # Check if there is an existing misconfiguration involving storage or public access
-    has_misconfigured_str = any(f.finding_type == 'misconfiguration' and 'public' in str(f.title).lower() for f in findings)
-    
-    incidents_created = []
+    # 1. Malware + Data Leak Pattern
+    if has_malware and has_data_leak:
+        resources = list(set([f.resource_id for f in findings if f.finding_type in ['malware', 'data_leak']]))
+        create_incident_if_new(
+            db, project_id, incidents_created,
+            "CRITICAL: Active Malware in Sensitive Data Storage",
+            "CRITICAL",
+            "An attacker could use malware to exfiltrate unredacted PII or credentials found in the same storage context.",
+            "Remove malicious files, rotate any potential leaks, and enable zero-trust access controls.",
+            resources
+        )
 
-    # Correlate
-    if has_malware and (has_data_leak or has_misconfigured_str):
-        severity = "CRITICAL"
-        title = "CRITICAL: Malware co-exists with Data Leaks or Public Misconfigurations"
-        attack_path = "Attacker accesses public resources, discovers leaked credentials, and executes malware to pivot internally."
-        recommendation = "1) Immediately quarantine malware. 2) Rotate leaked secrets. 3) Restrict public access."
-    elif has_data_leak and has_misconfigured_str:
-        severity = "CRITICAL"
-        title = "CRITICAL: Public File Contains PII or Secrets"
-        attack_path = "Public exposure directly exposes unredacted PII and/or API Keys to the open internet."
-        recommendation = "Block public access immediately and rotate secrets."
-    elif has_malware:
-        severity = "HIGH"
-        title = "HIGH: Malware found in Storage"
-        attack_path = "Malicious executable could be triggered by internal processes or unaware users."
-        recommendation = "Remove execution permissions and delete malicious files."
-    elif has_data_leak:
-        severity = "HIGH"
-        title = "HIGH: Sensitive Data Exposure (PII / Secrets)"
-        attack_path = "Internal users or compromised accounts could harvest plaintext sensitive data."
-        recommendation = "Redact sensitive data from storage and rotate compromised keys."
-    else:
-        return incidents_created # No new incident generated from correlation
+    # 2. Public Bucket + Exposure Pattern
+    if has_misconfigured_str and (has_data_leak or has_malware):
+        resources = list(set([f.resource_id for f in findings if (f.finding_type == 'misconfiguration' and 'public' in str(f.title).lower()) or f.finding_type in ['data_leak', 'malware']]))
+        create_incident_if_new(
+            db, project_id, incidents_created,
+            "CRITICAL: Public Exposure of Sensitive Assets",
+            "CRITICAL",
+            "Public access allows anonymous actors to discover and download PII, secrets, or malicious payloads.",
+            "Immediately disable public access (Block Public Access) and audit access logs for unauthorized downloads.",
+            resources
+        )
 
-    # Deduplicate logic: check if this incident type already exists for project
-    existing = db.query(Incident).filter(Incident.project_id == project_id, Incident.title == title).first()
+    # 3. Identity Over-permission + Secret Leak Pattern (NEW)
+    has_wildcard_iam = any(f.finding_type == 'iam_risk' and 'Wildcard' in str(f.title) for f in findings)
+    has_secret = any(f.finding_type == 'secret' for f in findings)
+    if has_wildcard_iam and has_secret:
+        resources = list(set([f.resource_id for f in findings if f.finding_type in ['iam_risk', 'secret']]))
+        create_incident_if_new(
+            db, project_id, incidents_created,
+            "HIGH: Over-privileged Identity with Leaked Secrets",
+            "HIGH",
+            "A principal with wildcard permissions has access to leaked secrets, creating a high risk of lateral movement.",
+            "Restrict IAM policies to least-privilege and rotate the leaked secrets found in the code/logs.",
+            resources
+        )
+
+    return incidents_created
+
+def create_incident_if_new(db: Session, project_id: int, created_list: list, title: str, severity: str, path: str, rec: str, resources: list):
+    # Deduplicate against existing incidents for this project with the same title
+    existing = db.query(Incident).filter(
+        Incident.project_id == project_id, 
+        Incident.title == title,
+        Incident.status != 'RESOLVED'
+    ).first()
     
     if not existing:
         incident = Incident(
             project_id=project_id,
             title=title,
             severity=severity,
-            affected_resources=["datasets/s3_bucket"],
-            attack_path=attack_path,
-            recommendation=recommendation
+            affected_resources=resources,
+            attack_path=path,
+            recommendation=rec,
+            status="OPEN"
         )
         db.add(incident)
-        incidents_created.append(incident)
         db.commit()
-    
-    return incidents_created
+        db.refresh(incident)
+        created_list.append(incident)

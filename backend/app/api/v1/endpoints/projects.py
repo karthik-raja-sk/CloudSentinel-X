@@ -23,29 +23,38 @@ def list_projects(
     organization_id: int | None = None,
 ):
     role = (current_user.role or "").lower()
+    
+    # Superusers and Demo roles see all projects
     if current_user.is_superuser or role.startswith("demo_"):
-        projects = db.query(Project).order_by(Project.id.asc()).all()
+        query = db.query(Project)
+        if organization_id is not None:
+            query = query.filter(Project.organization_id == organization_id)
+            
+        projects = query.order_by(Project.id.asc()).all()
         for p in projects:
             p.current_role = "admin"
-    else:
-        memberships = (
-            db.query(ProjectMembership)
-            .filter(ProjectMembership.user_id == current_user.id)
-            .all()
-        )
-        project_ids = [m.project_id for m in memberships]
-        role_map = {m.project_id: m.role for m in memberships}
-        projects = (
-            db.query(Project)
-            .filter(Project.id.in_(project_ids))
-            .order_by(Project.id.asc())
-            .all()
-        )
-        if organization_id is not None:
-            projects = [p for p in projects if p.organization_id == organization_id]
-        for p in projects:
-            p.current_role = role_map.get(p.id)
+        return projects
+        
+    # Standard users see projects they are members of
+    # Optimization: Use a single JOIN query to fetch projects and roles
+    results = (
+        db.query(Project, ProjectMembership.role)
+        .join(ProjectMembership, ProjectMembership.project_id == Project.id)
+        .filter(ProjectMembership.user_id == current_user.id)
+    )
+    
+    if organization_id is not None:
+        results = results.filter(Project.organization_id == organization_id)
+        
+    results = results.order_by(Project.id.asc()).all()
+    
+    projects = []
+    for p, pm_role in results:
+        p.current_role = pm_role
+        projects.append(p)
+        
     return projects
+
 
 @router.post("/", response_model=ProjectResponse)
 def create_project(
@@ -57,13 +66,20 @@ def create_project(
     if org_id:
         deps.ensure_org_permission(org_id, "project:create", db, current_user)
     else:
-        first_org_membership = (
-            db.query(OrganizationMembership)
-            .filter(OrganizationMembership.user_id == current_user.id)
-            .order_by(OrganizationMembership.id.asc())
-            .first()
-        )
-        org_id = first_org_membership.organization_id if first_org_membership else None
+        # Try to infer organization if only one membership exists, otherwise require explicit ID
+        memberships = db.query(OrganizationMembership).filter(OrganizationMembership.user_id == current_user.id).all()
+        if len(memberships) == 1:
+            org_id = memberships[0].organization_id
+        elif len(memberships) > 1:
+            raise HTTPException(
+                status_code=400, 
+                detail="Multiple organizations found. Please specify organization_id explicitly."
+            )
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail="Organization context missing. You must create or join an organization first."
+            )
 
     project = Project(
         name=project_in.name,

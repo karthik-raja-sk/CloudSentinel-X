@@ -121,15 +121,37 @@ def refresh_token(request: Request, response: Response, db: Session = Depends(de
     except (JWTError, ValidationError):
         AuditService.log(db, "refresh_failed", "failure", ip_address=ip, message="Invalid token structure")
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+
     if token_data.type != "refresh" or not token_data.rti or not token_data.sub:
         AuditService.log(db, "refresh_failed", "failure", ip_address=ip, message="Invalid refresh token claims")
         raise HTTPException(status_code=401, detail="Invalid refresh token")
             
-    target_user = db.query(User).filter(User.refresh_token_id == token_data.rti).first()
-            
-    if not target_user or str(target_user.id) != str(token_data.sub):
-        AuditService.log(db, "refresh_failed", "failure", ip_address=ip, message="Token revoked or user missing")
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    # Try to find user by sub (id) first to check for reuse
+    try:
+        user_id = int(token_data.sub)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid token subject")
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    # Reuse Detection Logic
+    if target_user.refresh_token_id != token_data.rti:
+        # POTENTIAL REUSE ATTACK
+        # If the user has a refresh_token_id but it doesn't match this token's RTI,
+        # and this token is otherwise valid (not expired - checked by jwt.decode),
+        # it means someone is using an old token.
+        target_user.refresh_token_id = None # REVOKE ALL
+        db.commit()
+        response.delete_cookie("cloudsentinel_refresh")
+        
+        AuditService.log(
+            db, "refresh_token_reuse_detected", "critical", 
+            user_id=target_user.id, email=target_user.email, 
+            ip_address=ip, message="Refresh token reuse detected. Revoking all sessions."
+        )
+        raise HTTPException(status_code=401, detail="Session expired or token reused. Please login again.")
         
     # Rotate
     generate_refresh_token_and_set_cookie(response, target_user, db)
@@ -143,6 +165,7 @@ def refresh_token(request: Request, response: Response, db: Session = Depends(de
         ),
         "token_type": "bearer",
     }
+
 
 @router.post("/logout")
 def logout(request: Request, response: Response, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user)):

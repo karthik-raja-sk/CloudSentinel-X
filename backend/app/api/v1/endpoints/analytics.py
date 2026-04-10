@@ -17,36 +17,20 @@ def get_analytics_summary(
     db: Session = Depends(get_db),
     _project: Project = Depends(deps.get_project_or_403),
 ):
-    # Verify project
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
     # Total Scans
     total_scans = db.query(Scan).filter(Scan.project_id == project_id).count()
 
-    # Base query for findings in this project
-    scan_types = ["CONFIG_UPLOAD", "FILE_SCAN", "DATA_LEAK_SCAN"]
-    latest_scan_ids = []
-    for stype in scan_types:
-        latest = db.query(Scan.id).filter(Scan.project_id == project_id, Scan.scan_type == stype).order_by(Scan.id.desc()).first()
-        if latest:
-            latest_scan_ids.append(latest.id)
-            
-    if not latest_scan_ids:
-        findings_q = db.query(Finding).filter(False) # Empty query
-    else:
-        findings_q = db.query(Finding).filter(Finding.scan_id.in_(latest_scan_ids))
-        
+    # Active Vulnerability Model: Aggregate all OPEN or IN_PROGRESS findings across all scans for this project
+    findings_q = (
+        db.query(Finding)
+        .join(Scan, Scan.id == Finding.scan_id)
+        .filter(Scan.project_id == project_id)
+        .filter(Finding.remediation_status.in_(["OPEN", "IN_PROGRESS"]))
+    )
     total_findings = findings_q.count()
 
     # Severity Distribution
-    severity_distribution = {
-        "CRITICAL": 0,
-        "HIGH": 0,
-        "MEDIUM": 0,
-        "LOW": 0
-    }
+    severity_distribution = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
     severity_counts = findings_q.with_entities(Finding.severity, func.count(Finding.id))\
         .group_by(Finding.severity).all()
         
@@ -60,10 +44,9 @@ def get_analytics_summary(
         .group_by(Finding.finding_type).all()
         
     for ftype, count in type_counts:
-        # Normalize finding types for UI display if needed, or send as is
         findings_by_type[ftype or "UNKNOWN"] = count
 
-    # Scan Trend (single aggregated query instead of per-scan N+1 counts)
+    # Scan Trend
     scan_trend_rows = (
         db.query(
             Scan.id,
@@ -85,24 +68,22 @@ def get_analytics_summary(
         for row in reversed(scan_trend_rows)
     ]
 
-    # Single grouped query for finding type counts
     type_count_map = {k: v for k, v in type_counts}
+    
+    # Ensure consistency with frontend keys
     cloud_misconfig_count = int(type_count_map.get("misconfiguration", 0))
     pii_exposure_count = int(type_count_map.get("pii_exposure", 0))
     malware_count = int(type_count_map.get("malware", 0))
-    data_leaks_count = int(type_count_map.get("data_leak", 0))
+    data_leaks_count = int(type_count_map.get("data_leak", 0)) # Fixed key
 
     critical_incidents_count = db.query(Incident).filter(
         Incident.project_id == project_id,
         Incident.severity == 'CRITICAL'
     ).count()
 
-    # Needing remediation (single aggregate query)
     findings_needing_remediation = (
-        findings_q.with_entities(func.count(Finding.id))
-        .filter(Finding.recommendation_type.is_not(None))
-        .scalar()
-        or 0
+        findings_q.filter(Finding.recommendation_type.is_not(None))
+        .count()
     )
 
     return {
@@ -115,6 +96,8 @@ def get_analytics_summary(
         "pii_exposure_count": pii_exposure_count,
         "malware_count": malware_count,
         "data_leaks_count": data_leaks_count,
+        "incident_count": critical_incidents_count, # Aligned with user request
         "critical_incidents_count": critical_incidents_count,
         "findings_needing_remediation": findings_needing_remediation
     }
+

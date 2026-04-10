@@ -13,15 +13,17 @@ export default function DashboardLayout() {
     projects, 
     selectedProjectId, 
     setSelectedProjectId, 
-    loading, 
-    error,
+    loading: projectsLoading, 
+    error: projectsError,
     handleCreateProject
   } = useProjectContext();
-  const { role, user, logout } = useAuth();
+  const { role, user, logout, isLoading: authLoading } = useAuth();
   
   const navigate = useNavigate();
   const location = useLocation();
   const [newProjectName, setNewProjectName] = useState('');
+  const [newOrgName, setNewOrgName] = useState('');
+  const [localError, setLocalError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
   const handleLogout = () => {
@@ -31,20 +33,28 @@ export default function DashboardLayout() {
 
   const createNewProject = async () => {
     if (!newProjectName.trim()) return;
+    if (organizations.length === 0 && !newOrgName.trim()) {
+      setLocalError('Organization name is required to get started.');
+      return;
+    }
+
     setIsCreating(true);
+    setLocalError(null);
     try {
-      await handleCreateProject(newProjectName);
+      await handleCreateProject(newProjectName, newOrgName);
       setNewProjectName('');
+      setNewOrgName('');
       navigate('/dashboard');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setLocalError(e.message || 'An unexpected error occurred.');
     } finally {
       setIsCreating(false);
     }
   };
 
-  // 1. Handle Global Loading
-  if (loading && projects.length === 0) {
+  // 1. Handle Global Loading (Auth or Projects)
+  if (authLoading || (projectsLoading && projects.length === 0)) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
@@ -53,13 +63,14 @@ export default function DashboardLayout() {
   }
 
   // 2. Handle Global Error
-  if (error && projects.length === 0) {
+  // Only show if auth is ready but projects still failed and no data is back
+  if (projectsError && projects.length === 0 && !authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
          <div className="text-center p-8 bg-white rounded-lg shadow-sm border border-red-200">
            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
            <h3 className="text-lg font-bold text-red-900 mb-2">Failed to load Configuration</h3>
-           <p className="text-red-600 text-sm mb-4">{error}</p>
+           <p className="text-red-600 text-sm mb-4">{projectsError}</p>
          </div>
       </div>
     );
@@ -67,6 +78,7 @@ export default function DashboardLayout() {
 
   // 3. Handle Empty State (No Projects)
   if (projects.length === 0) {
+    const hasNoOrgs = organizations.length === 0;
     return (
       <div className="flex flex-col h-screen bg-gray-100">
         <header className="h-16 bg-white border-b flex items-center justify-between px-6 shadow-sm">
@@ -74,24 +86,51 @@ export default function DashboardLayout() {
           <button onClick={handleLogout} className="text-sm bg-gray-200 hover:bg-gray-300 transition text-gray-800 px-4 py-1.5 rounded-md shadow-sm font-medium">Logout</button>
         </header>
         <div className="flex-1 flex items-center justify-center">
-            <div className="w-[450px] bg-white p-10 rounded-2xl shadow-lg border border-gray-100 text-center">
+            <div className="w-[500px] bg-white p-10 rounded-2xl shadow-lg border border-gray-100 text-center">
               <h2 className="text-2xl font-extrabold text-gray-900 mb-2">Welcome to CloudSentinel</h2>
-              <p className="text-gray-500 mb-8 font-medium">Get started by creating your first organizational project workspace.</p>
+              <p className="text-gray-500 mb-8 font-medium">
+                {hasNoOrgs 
+                  ? "Set up your organization and first workspace to get started." 
+                  : "Get started by creating your first project workspace."}
+              </p>
               
-              <div className="space-y-4">
-                <input 
-                  type="text" 
-                  value={newProjectName}
-                  onChange={e => setNewProjectName(e.target.value)}
-                  placeholder="e.g. AWS Production Setup"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+              <div className="space-y-4 text-left">
+                {hasNoOrgs && (
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Organization Name</label>
+                    <input 
+                      type="text" 
+                      value={newOrgName}
+                      onChange={e => setNewOrgName(e.target.value)}
+                      placeholder="e.g. Acme Corp"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Project Workspace Name</label>
+                  <input 
+                    type="text" 
+                    value={newProjectName}
+                    onChange={e => setNewProjectName(e.target.value)}
+                    placeholder="e.g. AWS Production Setup"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                {localError && (
+                  <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex items-start space-x-2">
+                    <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                    <span className="text-xs text-red-600 font-medium">{localError}</span>
+                  </div>
+                )}
+
                 <button 
                   onClick={createNewProject}
-                  disabled={isCreating || !newProjectName.trim()}
-                  className="w-full flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 transition duration-150 font-bold"
+                  disabled={isCreating || !newProjectName.trim() || (hasNoOrgs && !newOrgName.trim())}
+                  className="w-full flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 transition duration-150 font-bold mt-4"
                 >
-                  {isCreating ? <Loader2 className="w-5 h-5 animate-spin" /> : <><PlusCircle className="w-5 h-5 mr-2" /> Create Project workspace</>}
+                  {isCreating ? <Loader2 className="w-5 h-5 animate-spin" /> : <><PlusCircle className="w-5 h-5 mr-2" /> {hasNoOrgs ? 'Set up Board' : 'Create Project workspace'}</>}
                 </button>
               </div>
             </div>
@@ -107,20 +146,45 @@ export default function DashboardLayout() {
     <div className="flex h-screen bg-gray-100">
       <div className="w-64 bg-dark text-white p-4 hidden md:block border-r border-gray-800 shrink-0">
         <h1 className="text-2xl font-bold text-blue-500 mb-8 px-2 tracking-tight">CloudSentinel X</h1>
-        <nav className="space-y-2 flex flex-col h-[calc(100vh-100px)]">
-           <div className="flex-1">
-             {['dashboard', 'upload', 'findings', 'malware', 'data-leaks', 'incidents', 'iam', 'logs', 'attack-paths', 'audit-logs', 'project-members', 'organization-members'].map(route => (
+        <nav className="space-y-1.5 flex flex-col h-[calc(100vh-100px)]">
+           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+             {[
+               { id: 'dashboard', label: 'Overview' },
+               { id: 'upload', label: 'Infrastructure Upload' },
+               { id: 'findings', label: 'Security Findings' },
+               { id: 'malware', label: 'Malware Detection' },
+               { id: 'data_leaks', label: 'Sensitive Data' },
+               { id: 'incidents', label: 'Incident Response' },
+               { id: 'iam', label: 'IAM Analysis' },
+               { id: 'attack-paths', label: 'Attack Vectors' },
+             ].map(item => (
                 <Link 
-                   key={route}
-                   to={`/${route}`} 
-                   className={`block px-3 py-2.5 rounded-lg transition font-medium capitalize mb-1 ${location.pathname === `/${route}` ? 'bg-blue-600 text-white shadow-sm' : 'hover:bg-gray-800 text-gray-300 hover:text-white'}`}
+                   key={item.id}
+                   to={`/${item.id.replace('_', '-')}`} 
+                   className={`block px-3 py-2 rounded-lg transition font-medium mb-0.5 ${location.pathname === `/${item.id.replace('_', '-')}` ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-800 hover:text-white'}`}
                  >
-                   {route.replace('-', ' ')}
-               </Link>
+                   {item.label}
+                </Link>
              ))}
-             <div className="pt-4 mt-4 border-t border-gray-800">
-                <Link to="/scans" className={`block px-3 py-2 rounded transition text-sm ${location.pathname === `/scans` ? 'text-white font-bold' : 'text-gray-500 hover:text-gray-300'}`}>Scan History</Link>
-             </div>
+
+             <div className="mt-6 mb-2 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Management</div>
+             {[
+               { id: 'scans', label: 'Scan History' },
+               { id: 'logs', label: 'Activity Logs' },
+               ...(role?.toLowerCase().includes('admin') ? [
+                 { id: 'audit-logs', label: 'System Audit' },
+                 { id: 'organization-members', label: 'Organization' },
+               ] : []),
+               { id: 'project-members', label: 'Project Team' },
+             ].map(item => (
+                <Link 
+                   key={item.id}
+                   to={`/${item.id}`} 
+                   className={`block px-3 py-1.5 rounded-lg transition text-sm mb-0.5 ${location.pathname === `/${item.id}` ? 'text-blue-400 font-bold' : 'text-gray-400 hover:text-gray-200'}`}
+                 >
+                   {item.label}
+                </Link>
+             ))}
            </div>
 
            <div className="mt-auto">

@@ -1,23 +1,23 @@
-import { Component, ErrorInfo, ReactNode } from "react";
-import { AlertCircle, RefreshCcw } from "lucide-react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
+import { AlertTriangle, Home, RefreshCw } from "lucide-react";
 
 interface Props {
-  children: ReactNode;
+  children?: ReactNode;
+  fallback?: ReactNode;
 }
 
 interface State {
   hasError: boolean;
-  error: Error | null;
+  error?: Error;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null,
+    error: undefined,
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
@@ -26,39 +26,67 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReset = () => {
-    this.setState({ hasError: false, error: null });
-    window.location.reload();
+    this.setState({ hasError: false, error: undefined });
+    window.location.assign("/");
   };
 
   public render() {
     if (this.state.hasError) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] p-8 bg-white rounded-2xl shadow-sm border border-red-100 text-center">
-          <div className="p-4 bg-red-50 rounded-full mb-6">
-            <AlertCircle className="w-12 h-12 text-red-500" />
-          </div>
-          <h2 className="text-2xl font-black text-gray-900 mb-2">Something went wrong</h2>
-          <p className="text-gray-500 mb-8 max-w-md mx-auto font-medium">
-            The page encountered a runtime error. This has been contained to prevent the entire app from crashing.
-          </p>
-          
-          <div className="bg-gray-50 p-4 rounded-lg mb-8 text-left w-full max-w-lg border border-gray-200">
-             <p className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-widest">Error Details</p>
-             <code className="text-xs text-red-600 break-all">{this.state.error?.message || "Unknown Runtime Error"}</code>
-          </div>
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
 
-          <button
-            onClick={this.handleReset}
-            className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-sm transition-all"
-          >
-            <RefreshCcw className="w-5 h-5 mr-2" />
-            Reload & Reset Workspace
-          </button>
+      return (
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-red-100 p-8 text-center">
+            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Something went wrong
+            </h1>
+            <p className="text-gray-600 mb-8">
+              The application encountered an unexpected error. We&apos;ve been
+              notified and are looking into it.
+            </p>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="w-full flex items-center justify-center px-4 py-3 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200"
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Reload Page
+              </button>
+
+              <button
+                type="button"
+                onClick={this.handleReset}
+                className="w-full flex items-center justify-center px-4 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </button>
+            </div>
+
+            {import.meta.env.DEV && this.state.error && (
+              <div className="mt-8 text-left bg-gray-900 rounded-lg p-4 overflow-auto max-h-40">
+                <p className="text-red-400 font-mono text-xs mb-1">
+                  Error Trace:
+                </p>
+                <p className="text-gray-300 font-mono text-xs whitespace-pre-wrap">
+                  {this.state.error.toString()}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       );
     }
 
-    return this.props.children;
+    return this.props.children ?? null;
   }
 }
 
