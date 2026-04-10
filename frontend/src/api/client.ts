@@ -2,11 +2,12 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1',
+  withCredentials: true,
 });
 
 // Request interceptor to attach JWT token if it exists (useful as a hardening measure)
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('cloudSentinelToken');
   if (token) {
     config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
@@ -135,3 +136,4 @@ export const triggerCorrelation = async (projectId: number) => {
   const response = await api.post(`/scans/${projectId}/correlate`);
   return response.data;
 };
+ 

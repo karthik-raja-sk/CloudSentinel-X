@@ -24,6 +24,7 @@ export default function Findings() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [previewFinding, setPreviewFinding] = useState<any>(null);
+  const isAdminRole = String(role || '').toLowerCase() === 'admin' || String(role || '').toLowerCase() === 'demo_admin';
 
   const fetchFindings = async () => {
     try {
@@ -47,7 +48,7 @@ export default function Findings() {
   }, [projectId]);
 
   const handleStatusChange = async (findingId: number, newStatus: string) => {
-    if (role !== 'Admin') return;
+    if (!isAdminRole) return;
     try {
       await updateFindingStatus(findingId, newStatus);
       setFindings(prev => prev.map(f => f && f.id === findingId ? { ...f, remediation_status: newStatus } : f));
@@ -244,7 +245,7 @@ export default function Findings() {
                     )}
                   </td>
                   <td className="px-6 py-5 whitespace-nowrap text-right space-x-2">
-                     {role === 'Admin' && (
+                     {isAdminRole && (
                        <select 
                          value={String(f.remediation_status || 'OPEN')}
                          onChange={(e) => handleStatusChange(f.id, e.target.value)}
