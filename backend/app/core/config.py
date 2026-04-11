@@ -31,12 +31,21 @@ class Settings(BaseSettings):
             return "sqlite:///./cloudsentinel.db"
         return self.DATABASE_URL
 
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: str | List[str]) -> List[str]:
+        if isinstance(v, str) and not v.startswith("["):
+            return [i.strip() for i in v.split(",")]
+        elif isinstance(v, (list, str)):
+            return v
+        raise ValueError(v)
+
     @field_validator("SECRET_KEY")
     @classmethod
-    def validate_secret_key(cls, value: str) -> str:
-        if not value or value == "supersecretkey":
-            # Keep local dev convenience, block insecure production boot.
-            return value
+    def validate_secret_key(cls, value: str, info) -> str:
+        if (getattr(info, "data", {}).get("ENVIRONMENT") or "development").lower() in ["prod", "production"]:
+            if not value or value == "supersecretkey":
+                raise ValueError("In production, SECRET_KEY must be a long, random string")
         return value
 
     @property

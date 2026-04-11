@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Shield, User, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { API_V1 } from '../api/client';
 
-const API_V1 = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function Login() {
   const { loginState } = useAuth();

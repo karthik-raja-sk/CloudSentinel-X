@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Shield, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { API_V1 } from '../api/client';
 
 export default function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -15,7 +16,7 @@ export default function VerifyEmail() {
       return;
     }
 
-    fetch('http://localhost:8000/api/v1/auth/verify-email', {
+    fetch(`${API_V1}/auth/verify-email`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token })

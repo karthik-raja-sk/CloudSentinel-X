@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_V1 = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
+const isProduction = import.meta.env.PROD;
+export const API_V1 = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 const api = axios.create({
   baseURL: API_V1,
@@ -87,7 +88,9 @@ api.interceptors.response.use(
         error.message = `Unexpected Response [${status}]: ${detail}`;
       }
     } else if (error.request) {
-      error.message = `Network Error: Backend server is unreachable at http://localhost:8000. Ensure the FastAPI server is running.`;
+      error.message = isProduction 
+        ? `Network Error: CloudSentinel backend is unreachable at ${API_V1}. Please check your connection or service status.`
+        : `Network Error: Backend server is unreachable at ${API_V1}. Ensure the FastAPI server is running locally.`;
     } else {
       error.message = `Request Error: ${error.message}`;
     }

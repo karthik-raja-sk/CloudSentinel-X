@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { API_V1 } from '../api/client';
 
 export type Role = 'admin' | 'analyst' | 'viewer' | 'demo_admin' | 'demo_analyst' | 'demo_viewer' | string;
 
@@ -22,7 +23,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -48,13 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     options.credentials = 'include'; // Essential for HttpOnly cookies
 
     // Ensure URL doesn't have double slashes if url starts with /
-    const targetUrl = url.startsWith('http') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+    const targetUrl = url.startsWith('http') ? url : `${API_V1}${url.startsWith('/') ? '' : '/'}${url}`;
     let res = await fetch(targetUrl, options);
 
     // Automatic Refresh Logic
     if (res.status === 401 && token && !url.includes('/auth/refresh')) {
       try {
-        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
+        const refreshRes = await fetch(`${API_V1}/auth/refresh`, {
           method: 'POST',
           credentials: 'include'
         });

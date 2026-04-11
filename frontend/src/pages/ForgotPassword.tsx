@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Loader2 } from 'lucide-react';
+import { API_V1 } from '../api/client';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -13,7 +14,7 @@ export default function ForgotPassword() {
     setError('');
 
     try {
-      const res = await fetch('http://localhost:8000/api/v1/auth/forgot-password', {
+      const res = await fetch(`${API_V1}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
